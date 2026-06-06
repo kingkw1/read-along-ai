@@ -1,6 +1,7 @@
 # 🦉 Read-Along AI: The Offline Reading Teacher
 
 **Live App:** [Insert Hugging Face Space Link]
+
 **Organization:** Hosted under the official [`build-small-hackathon`](https://huggingface.co/build-small-hackathon) HF Org.
 
 **A Build Small Hackathon Submission**
