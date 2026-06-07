@@ -8,9 +8,9 @@
 *Track: Backyard AI*
 
 ## 📖 The Vision
-Learning to read is a monumental milestone for young children, but it can be an intimidating process. **Read-Along AI** was built to solve a very specific problem: *[Insert personalization: e.g., Detail how you and Elizabeth homeschool your three children (ages 7, 6, and 4), and this tool was built specifically to solve the friction of your daily reading curriculum]* providing a patient, distraction-free, and interactive reading assistant that gives instant, gentle vocal feedback. 
+Learning to read is a monumental milestone for young children, but it can be an intimidating process. **Read-Along AI** was built to solve a very specific problem: *[Insert personalization: e.g., Detail how you homeschool your children, and this tool was built specifically to solve the friction of your daily reading curriculum]* providing a patient, distraction-free, and interactive reading assistant that gives instant, gentle vocal feedback. 
 
-**Field Testing Note:** *[Insert brief anecdote or reaction from the 4, 6, and 7-year-olds actually using the app here to prove real-world usage for the Backyard AI track]*
+**Field Testing Note:** *[Insert brief anecdote or reaction from the children actually using the app here to prove real-world usage for the Backyard AI track]*
 
 Crucially, because this tool is for kids, it requires absolute data privacy. It leverages localized, small-parameter models to ensure a child's voice data never enters a corporate data lake. 
 
@@ -43,10 +43,11 @@ This entire application, including the Gradio UI and backend Modal logic, was or
 * *Note to Judges: Please see the commit history for automated Codex attributions.*
 
 ### Modal Compute Awards
-The high-speed inference endpoints powering the Cohere and OpenBMB models are hosted entirely on **Modal**. This provides the necessary sub-second response times required to keep a young child focused. *(Note: Our Roadmap outlines swapping to local `llama.cpp` for Phase 2 to capture local execution badges).*
+The high-speed inference endpoints powering the Cohere and OpenBMB models are hosted entirely on **Modal**. This provides the necessary sub-second response times required to keep a young child focused. *(Note: Our Roadmap outlines utilizing Modal A100s for a rapid fine-tuning job and then attempting a swap to local `llama.cpp` during Phase 2 to capture the Well-Tuned and local execution badges).*
 
 ### Badges Claimed (Bonus Quest Champion Strategy)
 * 🏅 **Off-Brand:** The default Gradio UI has been completely overhauled with custom CSS to create a distraction-free, gamified experience for early learners.
+* 🏅 **Well-Tuned:** *[Insert Hugging Face Link to the fine-tuned model created during Phase 2]*
 * 🏅 **Tiny Titan:** The total combined footprint of the models used is strictly under the 4B parameter threshold. 
   * *Parameter Math:* Cohere Transcribe (2B) + OpenBMB VoxCPM (*[Insert Parameter Count]*) = ***[Insert Total] Parameters***.
 * 🏅 **Sharing is Caring:** *[Insert Hugging Face Dataset Link to Codex Agent Traces]*
@@ -66,7 +67,9 @@ The app scales with the developmental stages of early readers:
 * Hugging Face Username: `kingkw1`
 
 ### About the Developer
-*[Placeholder for Developer Bio: Explicitly state your specialization in multimodal signal fusion and edge deployment. Briefly cite your previous wins with "AffectLink" (HP & NVIDIA Developer Challenge) and "The Lung Listener" (Google Gemini API Hackathon). This signals to the judges—especially NVIDIA and Hugging Face—that the architecture is engineered by a seasoned professional.]*
+**Kevin King** is a Senior Machine Learning Engineer and AI Research Scientist with an M.S. in Neural and Electrical Engineering. With over seven years of enterprise MLOps experience, he specializes in multimodal signal fusion, neuro-symbolic architectures, and the deployment of local-first, air-gapped AI systems for resource-constrained environments.
+
+Kevin has a proven track record of engineering highly optimized, award-winning agentic workflows. His previous hackathon builds include **AffectLink** (a real-time multimodal emotion recognition pipeline that won 1st Place in the 2025 HP & NVIDIA Developer Challenge) and **The Lung Listener** (Winner of the 2026 Google Gemini API Hackathon). *Read-Along AI* represents a continuation of his focus on privacy-preserving, localized AI that solves tangible, real-world problems.
 
 ## 📜 Open Source License
 This project is licensed under the MIT License.

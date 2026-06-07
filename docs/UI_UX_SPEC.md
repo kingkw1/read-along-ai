@@ -6,6 +6,8 @@ The primary objective of this frontend is to provide a zero-distraction, highly 
 To qualify for the **Off-Brand Award**, this application must aggressively overwrite default Gradio styling using the `css` parameter in `gr.Blocks` and custom `gr.HTML` components. 
 
 ## 2. Global Styling Rules (Custom CSS)
+*Note: As per the Roadmap, aggressive CSS gamification and styling polish should be deferred to Phase 3 (Day 7) after the core Phase 1 backend event loop is proven.*
+
 Codex must inject the following CSS rules to override the default Gradio theme:
 * **Typography:** Use a highly legible, rounded sans-serif font (e.g., `'Nunito', 'Quicksand', 'Comic Sans MS', sans-serif`). 
 * **Sizing:** Text must be massive. Base font size for the target reading block should be at least `4rem` to `6rem`.
