@@ -33,3 +33,9 @@ Codex should write the Modal stub functions that the wrappers above will call. W
 Young users cannot parse stack traces. 
 * If the Modal ASR endpoint times out or fails, the `transcribe_audio` wrapper must catch the exception and return a specific string: `"[ASR_ERROR]"`. The Gradio UI must handle this silently by asking the user to "Try pressing record again!"
 * If the TTS endpoint fails, `synthesize_speech` must return `None`, and the UI should gracefully fail open (no audio plays, but the UI does not freeze).
+
+## 5. Testing Strategy
+As explicitly defined in Phase 1 (Verification Checkpoint 2), the backend API contract must be strictly isolated for testing:
+* Codex must generate a `test_backend.py` file.
+* This file must use `pytest` to invoke the `transcribe_audio` and `synthesize_speech` wrappers independently from the Gradio UI.
+* It should verify that passing a static `.wav` file to the ASR wrapper returns a valid transcription string, and that passing text to the TTS wrapper returns a valid bytes/path object.

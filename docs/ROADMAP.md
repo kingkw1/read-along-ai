@@ -1,55 +1,67 @@
 # Read-Along AI: 9-Day Development Roadmap & Architecture Strategy
 
 ## 1. Development Philosophy
-This hackathon sprint is strictly time-boxed. The primary directive is to secure a fully functional, high-speed application and record the demo video *before* attempting advanced local integrations. 
+This hackathon sprint is strictly time-boxed. The primary directive is to secure a fully functional Minimum Viable Product (MVP) as fast as possible, test the highest-risk technical hurdles immediately after, and save the UI gamification for the final polish.
 
-To achieve this, the application relies on a **Decoupled Two-Phase Architecture**:
-* **Phase 1 (Speed & Stability):** The Gradio UI routes all inference through fast, serverless Modal endpoints. This guarantees the app is ready for the demo video without local compute bottlenecks.
-* **Phase 2 (The Llama Swap):** Once the core app is secure, the backend is swapped to a local `llama.cpp` runtime to capture the "Llama Champion" and "Off the Grid" merit badges.
+## 2. Phase 1: The Barebones MVP (Days 1–4)
+*Goal: Establish a bulletproof, end-to-end event loop using "safe" cloud endpoints before attempting local deployment.*
 
-## 2. Phase 1: The Fast Build (Days 1–7)
-
-### Days 1–2: UI Scaffolding & Codex Integration
-* **Objective:** Establish the "Off-Brand" Gradio frontend and secure OpenAI Codex eligibility.
+### Days 1–2: UI Scaffolding & Mock Inference
+* **Objective:** Establish the Gradio frontend and secure OpenAI Codex eligibility.
 * **Tasks:**
-  * Use Codex to generate the base `app.py` utilizing the `UI_UX_SPEC.md`.
-  * Ensure all Gradio components are styled with custom CSS (no default textboxes).
+  * Use Codex to generate the base `app.py` utilizing the `UI_UX_SPEC.md`. 
+  * **Fail-Point Test:** Wire the UI to *mock* backend functions (e.g., functions that instantly return dummy text/audio) to verify the Gradio event loops, state management, and microphone capture work flawlessly without waiting for ML models to load.
   * Push initial commits to the public GitHub repository (ensuring Codex attribution).
+* **Verification Checkpoint 1:** **Run the Gradio app locally. Manually verify that clicking "Record" correctly captures audio and triggers the mock success state (confetti animation) without any stack trace errors in the terminal.**
 
-### Days 3–4: Backend Plumbing (Modal)
-* **Objective:** Wire the Gradio UI to the heavy ML models without locking up the main thread.
+### Days 3–4: Modal Plumbing & Core Logic
+* **Objective:** Connect the real brains and build the progression logic.
 * **Tasks:**
   * Deploy `modal_inference.py` containing the `run_cohere_asr` and `run_voxcpm_tts` endpoints.
-  * Connect the Gradio audio recording events to the Modal endpoints via the abstraction wrappers defined in `API_CONTRACT_SPEC.md`.
-  * Test round-trip latency to ensure it is suitable for a child's attention span.
+  * Connect the Gradio UI to the Modal endpoints via abstraction wrappers.
+  * Implement the progression states (Phonics -> CVC -> Sentences) and fuzzy-matching logic. 
+  * *Checkpoint:* The app is now fully functional. If everything else fails, this is your submission.
+* **Verification Checkpoint 2:** **Run `pytest test_backend.py` to verify Modal ASR and TTS endpoints return the correct JSON/bytes. Then, use `gradio.Client` to pass a test audio file through the full UI pipeline to confirm end-to-end integration.**
 
-### Days 5–6: Core Logic & Gamification
-* **Objective:** Build the brain of the reading teacher.
+## 3. Phase 2: The High-Risk Pivot (Days 5–6)
+*Goal: Chase the "Well-Tuned", "Off the Grid", and "Llama Champion" badges by moving compute to the edge.*
+
+### Day 5: The Modal Fine-Tuning Job
+* **Objective:** Secure the "Well-Tuned" badge and prepare for local deployment.
 * **Tasks:**
-  * Implement the progression states (Phonics -> CVC -> Sentences).
-  * Write the fuzzy-matching and Levenshtein distance logic for the ASR evaluation.
-  * Trigger the hidden HTML CSS animations (stars/confetti) upon successful reads.
+  * Utilize Modal's A100 infrastructure to run a rapid fine-tuning job (e.g., fine-tuning a tiny LLM for better phonetic error correction or a TTS voice).
+  * Export the resulting model weights to the quantized GGUF format.
 
-### Day 7: The Safety Net & Demo Recording
-* **Objective:** Lock in the hackathon submission requirements.
-* **Tasks:**
-  * Freeze feature development.
-  * Field-test the Phase 1 app with the target users (ages 4, 6, and 7).
-  * **Crucial:** Record the final demo video and draft the social media post using this stable, Modal-backed version.
-
-## 3. Phase 2: The Integration Stretch (Days 8–9)
-
-### Day 8: The `llama.cpp` Swap
-* **Objective:** Secure the "Llama Champion" and "Off the Grid" badges.
+### Day 6: The `llama.cpp` Edge Swap (Early Risk Test)
+* **Objective:** Test local runtime latency on the Hugging Face ZeroGPU.
 * **Tasks:**
   * Isolate the Modal wrapper functions in `app.py`.
-  * Pull quantized GGUF versions of the reasoning and TTS models into the Hugging Face Space.
-  * Use the `llama-cpp-python` bindings to redirect the wrapper functions to the local models.
-  * *Constraint:* If C++ variable consolidation or local runtime latency breaks the UX, immediately revert the wrappers back to the Modal endpoints.
+  * Pull the custom GGUF models into the Hugging Face Space.
+  * Use `llama-cpp-python` bindings to run the models locally.
+  * **Crucial Decision Point:** If the local latency ruins the child's UX, immediately abandon this phase and revert to the Phase 1 Modal endpoints. 
+* **Verification Checkpoint 3:** **Deploy to the Hugging Face Space. Measure the round-trip latency of a single phonetic read attempt. If it takes longer than 2.5 seconds, trigger the rollback to Modal.**
 
-### Day 9: Polish & Final Submission
-* **Objective:** Submit a winning entry.
+## 4. Phase 3: Bells, Whistles & Submission (Days 7–9)
+*Goal: Polish the UI, gather real-world proof, and stack the final badges.*
+
+### Day 7: Gamification & UI Polish
+* **Objective:** Secure the "Off-Brand" badge.
 * **Tasks:**
-  * Finalize the `README.md` to ensure all rules (Codex commits, Model parameters, Org submission) are strictly documented.
-  * Publish the social media post.
-  * Submit the Hugging Face Space link to the Build Small Hackathon portal before midnight UTC.
+  * Inject the custom CSS rules to overhaul the Gradio interface.
+  * Trigger the hidden HTML CSS animations (stars/confetti) upon successful reads.
+  * Ensure the text sizing and colors are optimized for a 4-to-7-year-old's accessibility.
+
+### Day 8: Field Testing & Demo Recording
+* **Objective:** Fulfill the *Backyard AI* criteria.
+* **Tasks:**
+  * Put the app in front of your kids.
+  * Record the final demo video showing real, authentic usage.
+  * Draft the required social media post.
+
+### Day 9: Final Submission & The Cleanup Badges
+* **Objective:** Submit the winning entry and capture the final Bonus Quests.
+* **Tasks:**
+  * Publish your dataset/agent traces to the Hub (Secures "Sharing is Caring").
+  * Publish a short blog post detailing your architecture choices (Secures "Field Notes").
+  * Finalize the `README.md` to ensure all rules are strictly documented.
+  * Submit the Hugging Face Space link to the portal.
