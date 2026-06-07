@@ -393,8 +393,8 @@ def build_app() -> gr.Blocks:
                 next_button = gr.Button("Next Word ➜", elem_classes="control-button", elem_id="next-word-button", variant="secondary")
                 listen_button = gr.Button("🔊 Listen to Sentence", elem_classes="control-button", variant="primary")
 
-            word_click_target = gr.Textbox(visible=False, elem_id="word-click-target")
-            word_click_submit = gr.Button(visible=False, elem_id="word-click-submit")
+            word_click_target = gr.Textbox(visible="hidden", elem_id="word-click-target")
+            word_click_submit = gr.Button(visible="hidden", elem_id="word-click-submit")
 
         microphone.change(
             fn=loading_feedback,
