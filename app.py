@@ -143,14 +143,29 @@ def is_cvc_match(transcript: str, target_text: str) -> bool:
     return any(levenshtein_distance(token, normalized_target) <= 1 for token in transcript_tokens)
 
 
+def contains_contiguous_token_sequence(haystack_tokens: list[str], needle_tokens: list[str]) -> bool:
+    """Return True when all target tokens appear in order as whole words."""
+    if len(needle_tokens) > len(haystack_tokens):
+        return False
+
+    return any(
+        haystack_tokens[index : index + len(needle_tokens)] == needle_tokens
+        for index in range(len(haystack_tokens) - len(needle_tokens) + 1)
+    )
+
+
 def is_sentence_match(transcript: str, target_text: str) -> bool:
     core_transcript = strip_filler_words(transcript)
     core_target = strip_filler_words(target_text)
+    transcript_tokens = core_transcript.split()
+    target_tokens = core_target.split()
 
-    if not core_transcript or not core_target:
+    if not transcript_tokens or not target_tokens:
         return False
-    if core_target in core_transcript or core_transcript in core_target:
+    if contains_contiguous_token_sequence(transcript_tokens, target_tokens):
         return True
+    if len(transcript_tokens) < len(target_tokens):
+        return False
     return levenshtein_distance(core_transcript, core_target) <= 2
 
 
