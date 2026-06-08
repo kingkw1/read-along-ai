@@ -157,7 +157,7 @@ def run_cohere_asr(audio_bytes: bytes) -> dict[str, str]:
             language="en",
             punctuation=False,
         ).to(model.device)
-        inputs.to(model.device, dtype=model.dtype)
+        inputs = inputs.to(model.device, dtype=model.dtype)
 
         with torch.inference_mode():
             outputs = model.generate(**inputs, max_new_tokens=256)
@@ -171,7 +171,11 @@ def run_cohere_asr(audio_bytes: bytes) -> dict[str, str]:
                     "language": "en",
                 }
             )
-        text = processor.decode(outputs, **decode_kwargs).strip()
+        decoded = processor.decode(outputs, **decode_kwargs)
+        if isinstance(decoded, list):
+            text = " ".join(str(chunk).strip() for chunk in decoded if str(chunk).strip())
+        else:
+            text = str(decoded).strip()
         return {"text": text, "status": "success"}
     finally:
         try:
