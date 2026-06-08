@@ -20,13 +20,13 @@ from Levenshtein import distance as levenshtein_distance
 MODAL_APP_NAME = "read-along-ai-inference"
 
 TARGET_SENTENCES = [
+    "The dog ran fast.",
     "M",
     "C",
     "S",
     "cat",
     "dog",
     "mat",
-    "The dog ran fast.",
     "A cat sat on a mat.",
     "We can read and play.",
 ]
@@ -222,6 +222,7 @@ def evaluate_reading(audio_filepath: str, current_index: int) -> tuple[str, Opti
     """Evaluate one read attempt and return feedback HTML plus optional praise audio."""
     transcript = transcribe_audio(audio_filepath)
     target_sentence = TARGET_SENTENCES[current_index]
+    print(f"[read-along] target={target_sentence!r} transcript={transcript!r}", flush=True)
 
     if transcript == "[ASR_ERROR]":
         return retry_feedback(), None
