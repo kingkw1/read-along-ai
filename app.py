@@ -1,29 +1,51 @@
 """Phase 1 Gradio scaffold for Read-Along AI.
 
-This file intentionally uses mock speech wrappers. The wrappers are the only
-functions the UI calls for ASR/TTS so the implementation can be swapped for
-Modal RPCs in a later phase without changing frontend event wiring.
+The wrappers are the only functions the UI calls for ASR/TTS so the
+implementation can be swapped without changing frontend event wiring.
 """
 
 from __future__ import annotations
 
 import html
+import re
 import tempfile
-import time
 import wave
 from pathlib import Path
 from typing import Optional
 
 import gradio as gr
+import modal
+from Levenshtein import distance as levenshtein_distance
+
+MODAL_APP_NAME = "read-along-ai-inference"
 
 TARGET_SENTENCES = [
     "The dog ran fast.",
+    "M",
+    "C",
+    "S",
+    "cat",
+    "dog",
+    "mat",
     "A cat sat on a mat.",
     "We can read and play.",
 ]
 
 SAMPLE_RATE = 16_000
 DUMMY_AUDIO_SECONDS = 1
+FILLER_WORDS = {"um", "uh", "like", "the"}
+PHONETIC_ALIASES = {
+    "a": {"a", "ah", "ay", "eh"},
+    "c": {"c", "k", "kuh", "see", "sea", "si"},
+    "d": {"d", "duh", "dee"},
+    "g": {"g", "guh", "gee"},
+    "m": {"m", "mm", "mmm", "em", "am", "um"},
+    "s": {"s", "ss", "sss", "ess"},
+    "t": {"t", "tuh", "tee", "tea"},
+    "cat": {"cat", "kat", "cap", "cot"},
+    "dog": {"dog", "dug", "dock", "dot"},
+    "mat": {"mat", "map", "met", "matt"},
+}
 
 
 def _write_silent_wav(label: str = "speech") -> str:
@@ -41,56 +63,119 @@ def _write_silent_wav(label: str = "speech") -> str:
     return str(output_path)
 
 
-# ---------------------------------------------------------------------------
-# Phase 1 mock Modal endpoint stubs.
-# ---------------------------------------------------------------------------
+def _modal_function(function_name: str):
+    lookup = getattr(modal.Function, "lookup", None)
+    if lookup is not None:
+        return lookup(MODAL_APP_NAME, function_name)
+    return modal.Function.from_name(MODAL_APP_NAME, function_name)
+
+
 def run_cohere_asr(audio_bytes: bytes) -> dict[str, str]:
-    """Mock Modal ASR RPC stub for Phase 1."""
-    del audio_bytes
-    time.sleep(1)
-    return {"text": "The dog ran fast.", "status": "success"}
+    """Invoke the deployed Modal ASR endpoint."""
+    return _modal_function("run_cohere_asr").remote(audio_bytes)
 
 
 def run_voxcpm_tts(text: str) -> bytes:
-    """Mock Modal TTS RPC stub for Phase 1."""
-    del text
-    time.sleep(1)
-    dummy_path = _write_silent_wav("tts")
-    return Path(dummy_path).read_bytes()
+    """Invoke the deployed Modal TTS endpoint."""
+    return _modal_function("run_voxcpm_tts").remote(text)
 
 
 # ---------------------------------------------------------------------------
 # Backend abstraction layer required by docs/API_CONTRACT_SPEC.md.
 # ---------------------------------------------------------------------------
 def transcribe_audio(audio_filepath: str) -> str:
-    """Return a clean transcription for a local microphone recording.
-
-    Phase 1 is mocked: this waits one second and returns the fixed phrase
-    required by the implementation brief.
-    """
-    del audio_filepath
+    """Return a clean transcription for a local microphone recording."""
     try:
-        time.sleep(1)
-        return "The dog ran fast."
+        audio_bytes = Path(audio_filepath).read_bytes()
+        result = run_cohere_asr(audio_bytes)
+        if result.get("status") != "success":
+            return "[ASR_ERROR]"
+        return normalize_text(result.get("text", ""))
     except Exception:
         return "[ASR_ERROR]"
 
 
 def synthesize_speech(target_text: str) -> Optional[str]:
-    """Return a local WAV path for generated speech.
-
-    Phase 1 is mocked: this waits one second and returns a generated silent WAV.
-    """
+    """Return a local WAV path for generated speech."""
     try:
-        time.sleep(1)
-        return _write_silent_wav(target_text)
+        audio_bytes = run_voxcpm_tts(target_text)
+        safe_label = "".join(ch for ch in target_text.lower() if ch.isalnum() or ch in ("-", "_"))[:24] or "speech"
+        output_path = Path(tempfile.gettempdir()) / f"read_along_{safe_label}.wav"
+        output_path.write_bytes(audio_bytes)
+        return str(output_path)
     except Exception:
         return None
 
 
 def normalize_text(text: str) -> str:
-    """Normalize spoken/target text for the simple Phase 1 evaluator."""
-    return "".join(ch.lower() for ch in text if ch.isalnum() or ch.isspace()).strip()
+    """Normalize spoken/target text for tolerant reading evaluation."""
+    return re.sub(r"\s+", " ", "".join(ch.lower() for ch in text if ch.isalnum() or ch.isspace())).strip()
+
+
+def strip_filler_words(text: str) -> str:
+    return " ".join(word for word in normalize_text(text).split() if word not in FILLER_WORDS)
+
+
+def target_level(target_text: str) -> int:
+    normalized = normalize_text(target_text)
+    if len(normalized) == 1 and normalized.isalpha():
+        return 1
+    if " " not in normalized and 3 <= len(normalized) <= 4:
+        return 2
+    return 3
+
+
+def is_phonetic_match(transcript: str, target_text: str) -> bool:
+    normalized_target = normalize_text(target_text)
+    transcript_tokens = set(normalize_text(transcript).split())
+    aliases = PHONETIC_ALIASES.get(normalized_target, {normalized_target})
+    return bool(transcript_tokens & aliases) or normalize_text(transcript) in aliases
+
+
+def is_cvc_match(transcript: str, target_text: str) -> bool:
+    normalized_target = normalize_text(target_text)
+    normalized_transcript = strip_filler_words(transcript)
+    transcript_tokens = normalized_transcript.split()
+    aliases = PHONETIC_ALIASES.get(normalized_target, {normalized_target})
+
+    if normalized_transcript in aliases or any(token in aliases for token in transcript_tokens):
+        return True
+    return any(levenshtein_distance(token, normalized_target) <= 1 for token in transcript_tokens)
+
+
+def contains_contiguous_token_sequence(haystack_tokens: list[str], needle_tokens: list[str]) -> bool:
+    """Return True when all target tokens appear in order as whole words."""
+    if len(needle_tokens) > len(haystack_tokens):
+        return False
+
+    return any(
+        haystack_tokens[index : index + len(needle_tokens)] == needle_tokens
+        for index in range(len(haystack_tokens) - len(needle_tokens) + 1)
+    )
+
+
+def is_sentence_match(transcript: str, target_text: str) -> bool:
+    core_transcript = strip_filler_words(transcript)
+    core_target = strip_filler_words(target_text)
+    transcript_tokens = core_transcript.split()
+    target_tokens = core_target.split()
+
+    if not transcript_tokens or not target_tokens:
+        return False
+    if contains_contiguous_token_sequence(transcript_tokens, target_tokens):
+        return True
+    if len(transcript_tokens) < len(target_tokens):
+        return False
+    return levenshtein_distance(core_transcript, core_target) <= 2
+
+
+def is_reading_match(transcript: str, target_text: str) -> bool:
+    level = target_level(target_text)
+    if level == 1:
+        return is_phonetic_match(transcript, target_text)
+    if level == 2:
+        return is_cvc_match(transcript, target_text)
+    return is_sentence_match(transcript, target_text)
 
 
 def render_reading_canvas(sentence: str) -> str:
@@ -152,11 +237,12 @@ def evaluate_reading(audio_filepath: str, current_index: int) -> tuple[str, Opti
     """Evaluate one read attempt and return feedback HTML plus optional praise audio."""
     transcript = transcribe_audio(audio_filepath)
     target_sentence = TARGET_SENTENCES[current_index]
+    print(f"[read-along] target={target_sentence!r} transcript={transcript!r}", flush=True)
 
     if transcript == "[ASR_ERROR]":
         return retry_feedback(), None
 
-    if normalize_text(transcript) == normalize_text(target_sentence):
+    if is_reading_match(transcript, target_sentence):
         praise_audio = synthesize_speech("Amazing reading!")
         return success_feedback(), praise_audio
 
