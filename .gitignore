@@ -1,2 +1,7 @@
 .hackathon/*
 .venv/*
+__pycache__/
+*.py[cod]
+*.wav
+.env
+.env.*
