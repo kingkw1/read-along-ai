@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import os
 import tempfile
+import wave
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +65,24 @@ def _ensure_cache_dirs() -> None:
     Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
 
+def _hf_token() -> str | None:
+    return (
+        os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+        or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    )
+
+
+def _is_silent_wav(audio_bytes: bytes) -> bool:
+    try:
+        with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
+            frames = wav_file.readframes(wav_file.getnframes())
+    except wave.Error:
+        return False
+
+    return bool(frames) and all(byte == 0 for byte in frames)
+
+
 def _load_cohere_asr() -> tuple[Any, Any]:
     global _cohere_processor, _cohere_model
 
@@ -76,12 +95,14 @@ def _load_cohere_asr() -> tuple[Any, Any]:
         _cohere_processor = AutoProcessor.from_pretrained(
             COHERE_MODEL_ID,
             cache_dir=CACHE_DIR,
+            token=_hf_token(),
         )
         _cohere_model = CohereAsrForConditionalGeneration.from_pretrained(
             COHERE_MODEL_ID,
             cache_dir=CACHE_DIR,
             device_map="auto",
             torch_dtype=dtype,
+            token=_hf_token(),
         )
         _cohere_model.eval()
         model_cache.commit()
@@ -115,6 +136,9 @@ def _load_voxcpm_tts() -> Any:
 )
 def run_cohere_asr(audio_bytes: bytes) -> dict[str, str]:
     """Transcribe WAV/audio bytes with Cohere Transcribe."""
+    if _is_silent_wav(audio_bytes):
+        return {"text": "", "status": "success"}
+
     import torch
     from transformers.audio_utils import load_audio
 
