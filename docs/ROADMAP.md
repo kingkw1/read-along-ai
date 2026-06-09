@@ -52,10 +52,10 @@ This hackathon sprint is strictly time-boxed. The primary directive is to secure
   * Ensure the text sizing and colors are optimized for a 4-to-7-year-old's accessibility.
 
 ### Day 8: Field Testing & Demo Recording
-* **Objective:** Fulfill the *Backyard AI* criteria.
+* **Objective:** Fulfill the *Backyard AI* criteria and target the "Best Demo" award.
 * **Tasks:**
-  * Put the app in front of your kids.
-  * Record the final demo video showing real, authentic usage.
+  * Put the app in front of the target users (ages 4, 6, and 7).
+  * Record the final demo video showing real, authentic usage. Focus heavily on narrative: clearly film the *problem* (e.g., frustration of reading practice) followed by the *solution* (the joy of the interactive confetti animation). Storytelling counts as much as the build!
   * Draft the required social media post.
 
 ### Day 9: Final Submission & The Cleanup Badges

@@ -1,7 +1,7 @@
 # Read-Along AI: Deployment & Environment Specification
 
 ## 1. Objective
-This document outlines the strict deployment architecture for hosting the Read-Along AI frontend on a Hugging Face Space while securely routing inference calls to Modal. Codex must structure the repository to support an automated, error-free deployment.
+This document outlines the strict deployment architecture for hosting the Read-Along AI frontend as a Hugging Face Space **inside the official `build-small-hackathon` organization**, while securely routing inference calls to Modal. Codex must structure the repository to support an automated, error-free deployment into this specific org.
 
 ## 2. File Structure
 Codex must generate and organize the repository using the following flat structure to comply with Hugging Face Spaces requirements:

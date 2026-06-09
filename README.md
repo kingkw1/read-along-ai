@@ -1,3 +1,21 @@
+---
+title: Read-Along AI
+emoji: 🦉
+colorFrom: blue
+colorTo: yellow
+sdk: gradio
+app_file: app.py
+pinned: false
+tags:
+  - build-small-hackathon
+  - backyard-ai
+  - off-brand
+  - tiny-titan
+  - sharing-is-caring
+  - field-notes
+  - well-tuned
+---
+
 # 🦉 Read-Along AI: The Offline Reading Teacher
 
 **Live App:** [Insert Hugging Face Space Link]
@@ -48,8 +66,8 @@ The high-speed inference endpoints powering the Cohere and OpenBMB models are ho
 ### Badges Claimed (Bonus Quest Champion Strategy)
 * 🏅 **Off-Brand:** The default Gradio UI has been completely overhauled with custom CSS to create a distraction-free, gamified experience for early learners.
 * 🏅 **Well-Tuned:** *[Insert Hugging Face Link to the fine-tuned model created during Phase 2]*
-* 🏅 **Tiny Titan:** The total combined footprint of the models used is strictly under the 4B parameter threshold. 
-  * *Parameter Math:* Cohere Transcribe (2B) + OpenBMB VoxCPM (*[Insert Parameter Count]*) = ***[Insert Total] Parameters***.
+* 🏅 **Tiny Titan:** Every individual model used in this pipeline (and their combined footprint) is strictly under the 4B parameter threshold.
+  * *Parameter Math:* Cohere Transcribe (2B) + OpenBMB VoxCPM (0.5B) = ***2.5B Total Parameters***.
 * 🏅 **Sharing is Caring:** *[Insert Hugging Face Dataset Link to Codex Agent Traces]*
 * 🏅 **Field Notes:** *[Insert Link to Blog Post / Medium Article]*
 
