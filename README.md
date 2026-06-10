@@ -91,3 +91,8 @@ Kevin has a proven track record of engineering highly optimized, award-winning a
 
 ## 📜 Open Source License
 This project is licensed under the MIT License.
+
+## Future Roadmap: Real-Time Streaming
+The long-term V2 architecture will move from batch-style audio processing to real-time WebSocket streaming so young readers can receive instant visual feedback as they speak. The goal is to dynamically highlight each word on the page using word-level ASR timestamps, creating a tighter read-aloud loop for 4, 6, and 7-year-old learners.
+
+For the 9-day hackathon MVP, real-time streaming was intentionally deferred to protect stability, privacy, and demo reliability. The planned post-hackathon architecture will refactor Gradio audio capture to use `streaming=True`, convert Modal inference endpoints into continuous generators, and extract word-level timestamps from the ASR model for live word highlighting.

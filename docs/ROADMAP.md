@@ -65,3 +65,14 @@ This hackathon sprint is strictly time-boxed. The primary directive is to secure
   * Publish a short blog post detailing your architecture choices (Secures "Field Notes").
   * Finalize the `README.md` to ensure all rules are strictly documented.
   * Submit the Hugging Face Space link to the portal.
+
+## 5. Phase 4: Post-Hackathon / V2 Architecture
+*Goal: Transition from batch processing to real-time streaming inference for instant visual feedback.*
+
+* **Objective:** Allow words to highlight dynamically as the child speaks.
+* **Architecture Shift:**
+  * Refactor Gradio `gr.Audio` to utilize `streaming=True` via WebSockets.
+  * Rewrite Modal endpoints as continuous generators.
+  * Implement word-level timestamp extraction from the ASR model.
+* **Product Impact:** Give early readers immediate visual confirmation by synchronizing spoken words with on-screen highlights, reducing the delay between effort and feedback.
+* **Engineering Rationale:** The hackathon MVP deliberately favors stable batch-style inference over streaming complexity so the core reading loop remains reliable during the 9-day sprint. V2 can introduce real-time streaming once the baseline experience is proven.
