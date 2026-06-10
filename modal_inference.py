@@ -130,7 +130,7 @@ def _load_voxcpm_tts() -> Any:
     image=inference_image,
     gpu="A10G",
     timeout=600,
-    min_containers=1,
+    min_containers=0,
     scaledown_window=300,
     volumes={CACHE_DIR: model_cache},
     secrets=[modal.Secret.from_name("huggingface-secret")],
