@@ -1,3 +1,4 @@
 gradio
 modal
 python-Levenshtein
+faster-whisper
