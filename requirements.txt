@@ -2,3 +2,16 @@ gradio
 modal
 python-Levenshtein
 faster-whisper
+pandas
+jupyter
+ipykernel
+nbformat
+nbclient
+torch
+transformers>=4.40.0
+accelerate
+peft
+trl
+bitsandbytes
+datasets
+sentencepiece
