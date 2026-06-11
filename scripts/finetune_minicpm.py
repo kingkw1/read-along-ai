@@ -27,16 +27,16 @@ finetune_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install(
         "torch",
-        "transformers>=4.40.0",
-        "peft",
-        "trl",
+        "transformers==4.40.2",
+        "peft==0.10.0",
+        "trl==0.8.6",
         "bitsandbytes",
         "datasets",
-        "accelerate",
+        "accelerate==0.29.3",
         "huggingface_hub",
+        "rich",
         "sentencepiece",
     )
-    .add_local_file("data/train.jsonl", remote_path=DATA_PATH)
     .env(
         {
             "HF_HOME": CACHE_DIR,
@@ -46,6 +46,7 @@ finetune_image = (
             "TOKENIZERS_PARALLELISM": "false",
         }
     )
+    .add_local_file("data/train.jsonl", remote_path=DATA_PATH)
 )
 
 
@@ -216,6 +217,7 @@ def train_minicpm() -> dict[str, str | int]:
 
 @app.local_entrypoint()
 def main():
+    print(f"Starting Modal fine-tune job: app={APP_NAME}, base={BASE_MODEL_ID}, hub_repo={HUB_REPO_ID}")
     result = train_minicpm.remote()
     print("Fine-tuning complete")
     print(result)
