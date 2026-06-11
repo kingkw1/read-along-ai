@@ -20,6 +20,13 @@ DEFAULT_OUTPUT_CSV = Path("data/baseline_results.csv")
 CSV_HEADERS = ["File", "Target Word", "ASR Transcript", "Strict Match"]
 
 
+def modal_function(app_name: str, function_name: str):
+    lookup = getattr(modal.Function, "lookup", None)
+    if lookup is not None:
+        return lookup(app_name, function_name)
+    return modal.Function.from_name(app_name, function_name)
+
+
 def target_word_from_filename(path: Path) -> str:
     """Extract the target word from names like 01_scientist.wav."""
     stem = path.stem
@@ -103,7 +110,7 @@ def main() -> int:
         print(f"Found {len(wav_files)} .wav file(s).")
         return 0
 
-    asr = modal.Function.lookup(MODAL_APP_NAME, MODAL_FUNCTION_NAME)
+    asr = modal_function(MODAL_APP_NAME, MODAL_FUNCTION_NAME)
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
     skipped_files = completed_files(args.output_csv) if args.resume else set()
     if skipped_files:
