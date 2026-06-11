@@ -1,6 +1,5 @@
 gradio
 modal
-python-Levenshtein
 faster-whisper
 pandas
 jupyter
