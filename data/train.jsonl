@@ -1,0 +1,50 @@
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: scientist | ASR: scientists", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: safari | ASR: so far", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: secret | ASR: secret", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: sunflower | ASR: sunny flowers", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: system | ASR: system", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: space | ASR: space", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: story | ASR: story", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: sudden | ASR: seven", "output": "False"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: super | ASR: super", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: silly | ASR: silly", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: dinosaur | ASR: dinosaur", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: invisible | ASR: and where's the ball", "output": "False"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: recipe | ASR: this is tea", "output": "False"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: fossil | ASR: five", "output": "False"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: blossom | ASR: blossom", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: massive | ASR: maze", "output": "False"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: message | ASR: message", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: guessing | ASR: yeah same", "output": "False"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: castle | ASR: castle", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: missing | ASR: missing", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: dangerous | ASR: dangerous", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: octopus | ASR: octopus", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: furious | ASR: furious", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: curious | ASR: curious", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: focus | ASR: focus", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: palace | ASR: palace", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: famous | ASR: famous", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: precious | ASR: precious", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: compass | ASR: come this", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: process | ASR: process", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: spectacular | ASR: spectacular", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: mystery | ASR: mystery", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: whisper | ASR: whisper", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: obstacle | ASR: obstacle", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: splendid | ASR: splendid", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: snowflake | ASR: snowflake", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: stadium | ASR: stadium", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: swallow | ASR: swallow", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: monster | ASR: monster", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: stampede | ASR: stampede", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: elephant | ASR: elephant", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: gravity | ASR: gravity", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: beautiful | ASR: beautiful", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: adventure | ASR: adventure", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: volcano | ASR: volcano", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: library | ASR: library", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: magnet | ASR: magnet", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: chocolate | ASR: chocolate", "output": "True"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: pyramid | ASR: apparently", "output": "False"}
+{"instruction": "Determine if the ASR transcript is a valid phonetic match for the target word. Output only True or False.", "input": "Target: window | ASR: wind up", "output": "True"}

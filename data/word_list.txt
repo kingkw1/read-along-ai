@@ -1,0 +1,60 @@
+
+**1. Initial "S" (Hard start on the phoneme)**
+1. Scientist
+2. Safari
+3. Secret
+4. Sunflower
+5. System
+6. Space
+7. Story
+8. Sudden
+9. Super
+10. Silly
+
+**2. Medial "S" (Transitioning into and out of the "s" mid-breath)**
+11. Dinosaur
+12. Invisible
+13. Recipe
+14. Fossil
+15. Blossom
+16. Massive
+17. Message
+18. Guessing
+19. Castle
+20. Missing
+
+**3. Final "S" (Trailing off the phoneme)**
+21. Dangerous
+22. Octopus
+23. Furious
+24. Curious
+25. Focus
+26. Palace
+27. Famous
+28. Precious
+29. Compass
+30. Process
+
+**4. Consonant Blends (The hardest variations: st, sp, sl, sm, sn, sw)**
+31. Spectacular
+32. Mystery
+33. Whisper
+34. Obstacle
+35. Splendid
+36. Snowflake
+37. Stadium
+38. Swallow
+39. Monster
+40. Stampede
+
+**5. Control Words (Absolutely NO "s" sound; ASR must be perfectly strict)**
+41. Elephant
+42. Gravity
+43. Beautiful
+44. Adventure
+45. Volcano
+46. Library
+47. Magnet
+48. Chocolate
+49. Pyramid
+50. Window
