@@ -20,7 +20,12 @@ APP_NAME = "read-along-ai-inference"
 CACHE_DIR = "/model-cache"
 COHERE_MODEL_ID = "CohereLabs/cohere-transcribe-03-2026"
 VOXCPM_MODEL_ID = "openbmb/VoxCPM-0.5B"
+MINICPM_MODEL_ID = "kingkw1/minicpm-phonetic-evaluator"
 SAMPLE_RATE = 16_000
+MINICPM_INSTRUCTION = (
+    "Determine if the ASR transcript is a valid phonetic match for the target word. "
+    "Output only True or False."
+)
 
 
 app = modal.App(APP_NAME)
@@ -55,10 +60,32 @@ inference_image = (
     )
 )
 
+minicpm_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install(
+        "torch",
+        "transformers==4.40.2",
+        "accelerate==0.29.3",
+        "huggingface_hub",
+        "sentencepiece",
+    )
+    .env(
+        {
+            "HF_HOME": CACHE_DIR,
+            "HF_HUB_CACHE": f"{CACHE_DIR}/hub",
+            "TRANSFORMERS_CACHE": f"{CACHE_DIR}/transformers",
+            "TORCH_HOME": f"{CACHE_DIR}/torch",
+            "TOKENIZERS_PARALLELISM": "false",
+        }
+    )
+)
+
 
 _cohere_processor: Any | None = None
 _cohere_model: Any | None = None
 _voxcpm_model: Any | None = None
+_minicpm_tokenizer: Any | None = None
+_minicpm_model: Any | None = None
 
 
 def _ensure_cache_dirs() -> None:
@@ -124,6 +151,64 @@ def _load_voxcpm_tts() -> Any:
         model_cache.commit()
 
     return _voxcpm_model
+
+
+def _load_minicpm_evaluator() -> tuple[Any, Any]:
+    global _minicpm_tokenizer, _minicpm_model
+
+    if _minicpm_tokenizer is None or _minicpm_model is None:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        _ensure_cache_dirs()
+        _minicpm_tokenizer = AutoTokenizer.from_pretrained(
+            MINICPM_MODEL_ID,
+            cache_dir=CACHE_DIR,
+            trust_remote_code=True,
+            token=_hf_token(),
+        )
+        if _minicpm_tokenizer.pad_token is None:
+            _minicpm_tokenizer.pad_token = _minicpm_tokenizer.eos_token
+
+        _minicpm_model = AutoModelForCausalLM.from_pretrained(
+            MINICPM_MODEL_ID,
+            cache_dir=CACHE_DIR,
+            device_map="auto",
+            torch_dtype=torch.float16,
+            trust_remote_code=True,
+            token=_hf_token(),
+        )
+        _minicpm_model.eval()
+        model_cache.commit()
+
+    return _minicpm_tokenizer, _minicpm_model
+
+
+def _format_minicpm_prompt(target_word: str, transcript: str) -> str:
+    return (
+        "### Instruction:\n"
+        f"{MINICPM_INSTRUCTION}\n\n"
+        "### Input:\n"
+        f"Target: {target_word} | ASR: {transcript}\n\n"
+        "### Output:\n"
+    )
+
+
+def _parse_boolean_response(text: str) -> str:
+    normalized = text.strip()
+    if normalized.startswith("True"):
+        return "True"
+    if normalized.startswith("False"):
+        return "False"
+
+    for token in normalized.replace("\n", " ").split():
+        clean_token = token.strip(" .,:;\"'`[]{}()").casefold()
+        if clean_token == "true":
+            return "True"
+        if clean_token == "false":
+            return "False"
+
+    return "False"
 
 
 @app.function(
@@ -214,3 +299,33 @@ def run_voxcpm_tts(text: str) -> bytes:
     buffer = io.BytesIO()
     sf.write(buffer, wav, SAMPLE_RATE, format="WAV")
     return buffer.getvalue()
+
+
+@app.function(
+    image=minicpm_image,
+    gpu="A10G",
+    timeout=300,
+    scaledown_window=300,
+    volumes={CACHE_DIR: model_cache},
+    secrets=[modal.Secret.from_name("huggingface-secret")],
+)
+def run_minicpm_evaluator(target_word: str, transcript: str) -> str:
+    """Classify whether an ASR transcript is an acceptable phonetic match."""
+    import torch
+
+    tokenizer, model = _load_minicpm_evaluator()
+    prompt = _format_minicpm_prompt(target_word=target_word, transcript=transcript)
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+
+    with torch.inference_mode():
+        output_ids = model.generate(
+            **inputs,
+            max_new_tokens=8,
+            do_sample=False,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        )
+
+    generated_ids = output_ids[0, inputs["input_ids"].shape[-1] :]
+    generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
+    return _parse_boolean_response(generated_text)
