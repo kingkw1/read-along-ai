@@ -1,27 +1,68 @@
-"""Unit tests for reading evaluation heuristics."""
+"""Unit tests for MiniCPM-backed reading evaluation."""
 
-from app import is_sentence_match
+from __future__ import annotations
 
-
-def test_sentence_match_rejects_single_word_substrings() -> None:
-    assert not is_sentence_match("dog", "The dog ran fast.")
+import app
 
 
-def test_sentence_match_rejects_partial_phrase_substrings() -> None:
-    assert not is_sentence_match("dog ran", "The dog ran fast.")
+def test_evaluate_reading_accepts_exact_match_without_judge(monkeypatch) -> None:
+    judge_calls: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(app, "transcribe_audio", lambda _path: "the dog ran fast")
+    monkeypatch.setattr(app, "synthesize_speech", lambda _text: "/tmp/praise.wav")
+    monkeypatch.setattr(
+        app,
+        "ask_minicpm_judge",
+        lambda target, transcript: judge_calls.append((target, transcript)) or False,
+    )
+
+    feedback, praise_audio = app.evaluate_reading("/tmp/audio.wav", 0)
+
+    assert "Amazing reading!" in feedback
+    assert praise_audio == "/tmp/praise.wav"
+    assert judge_calls == []
 
 
-def test_sentence_match_accepts_complete_sentence_with_filler_removed() -> None:
-    assert is_sentence_match("the dog ran fast", "The dog ran fast.")
+def test_evaluate_reading_accepts_minicpm_true_verdict(monkeypatch) -> None:
+    judge_calls: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(app, "transcribe_audio", lambda _path: "dog ran fass")
+    monkeypatch.setattr(app, "synthesize_speech", lambda _text: "/tmp/praise.wav")
+
+    def fake_judge(target: str, transcript: str) -> bool:
+        judge_calls.append((target, transcript))
+        return True
+
+    monkeypatch.setattr(app, "ask_minicpm_judge", fake_judge)
+
+    feedback, praise_audio = app.evaluate_reading("/tmp/audio.wav", 0)
+
+    assert "Amazing reading!" in feedback
+    assert praise_audio == "/tmp/praise.wav"
+    assert judge_calls == [("The dog ran fast.", "dog ran fass")]
 
 
-def test_sentence_match_accepts_complete_sentence_inside_extra_words() -> None:
-    assert is_sentence_match("um please the dog ran fast now", "The dog ran fast.")
+def test_evaluate_reading_retries_minicpm_false_verdict(monkeypatch) -> None:
+    monkeypatch.setattr(app, "transcribe_audio", lambda _path: "banana")
+    monkeypatch.setattr(app, "synthesize_speech", lambda _text: "/tmp/praise.wav")
+    monkeypatch.setattr(app, "ask_minicpm_judge", lambda _target, _transcript: False)
+
+    feedback, praise_audio = app.evaluate_reading("/tmp/audio.wav", 0)
+
+    assert "Nice try!" in feedback
+    assert praise_audio is None
 
 
-def test_sentence_match_rejects_embedded_word_substring() -> None:
-    assert not is_sentence_match("dog ran fastness", "The dog ran fast.")
+def test_ask_minicpm_judge_parses_true_verdict(monkeypatch) -> None:
+    monkeypatch.setattr(app, "run_minicpm_evaluator", lambda _target, _transcript: "True")
+
+    assert app.ask_minicpm_judge("cat", "kat")
 
 
-def test_sentence_match_allows_small_edit_distance_for_full_attempt() -> None:
-    assert is_sentence_match("dog ran fass", "The dog ran fast.")
+def test_ask_minicpm_judge_rejects_errors(monkeypatch) -> None:
+    def failing_evaluator(_target: str, _transcript: str) -> str:
+        raise RuntimeError("modal unavailable")
+
+    monkeypatch.setattr(app, "run_minicpm_evaluator", failing_evaluator)
+
+    assert not app.ask_minicpm_judge("cat", "banana")
