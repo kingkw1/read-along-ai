@@ -7,7 +7,7 @@ This document outlines the strict deployment architecture for hosting the Read-A
 Codex must generate and organize the repository using the following flat structure to comply with Hugging Face Spaces requirements:
 
 * `/app.py` - The main Gradio application and UI logic.
-* `/modal_inference.py` - The Modal backend definitions (`@app.function()` for Cohere and OpenBMB).
+* `/modal_inference.py` - The Modal backend definitions (`@app.function()` for Cohere, OpenBMB, and the fine-tuned MiniCPM evaluator).
 * `/requirements.txt` - The Python dependencies for the Hugging Face Space.
 * `/README.md` - The hackathon submission document containing the required Codex and Modal attributions.
 * `/.gitignore` - Must explicitly ignore any local `.wav` files, `.env` files, and `__pycache__`.
@@ -23,11 +23,12 @@ Codex must generate and organize the repository using the following flat structu
 The `requirements.txt` file must be kept as lightweight as possible to ensure fast boot times on the Hugging Face Space. Codex should include:
 * `gradio` (Specify a stable, recent version, e.g., `gradio>=4.0.0`)
 * `modal` (For the client-side RPC calls)
-* `python-Levenshtein` or `thefuzz` (For the fuzzy matching logic in Level 2 & 3)
+* `python-Levenshtein` or `thefuzz` only if the legacy local fuzzy matcher remains enabled.
 * *Note: Heavy ML dependencies like `torch`, `transformers`, or the `cohere` SDK must NOT be in this file. They belong strictly in the image definition of the Modal functions in `modal_inference.py`.*
+* *Note: MiniCPM evaluator dependencies (`torch`, `transformers==4.40.2`, `accelerate`, `sentencepiece`) belong in the dedicated Modal image for `run_minicpm_evaluator`, not in the Space runtime.*
 
 ## 5. Deployment Execution Flow
 When the developer pushes to the main branch, the expected execution flow is:
-1. **Backend Deploy:** The developer runs `modal deploy modal_inference.py` locally to push the inference endpoints to the cloud.
+1. **Backend Deploy:** The developer runs `modal deploy modal_inference.py` locally to push the ASR, TTS, and MiniCPM evaluator endpoints to the cloud.
 2. **Frontend Sync:** The Hugging Face Space automatically rebuilds using the GitHub repository integration.
 3. **Runtime:** When a user visits the Space, `app.py` boots up the Gradio UI, and any audio events trigger the authenticated Modal client to route the payloads to the pre-deployed serverless functions.

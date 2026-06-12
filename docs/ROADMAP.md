@@ -19,18 +19,27 @@ This hackathon sprint is strictly time-boxed. The primary directive is to secure
 * **Tasks:**
   * Deploy `modal_inference.py` containing the `run_cohere_asr` and `run_voxcpm_tts` endpoints.
   * Connect the Gradio UI to the Modal endpoints via abstraction wrappers.
-  * Implement the progression states (Phonics -> CVC -> Sentences) and fuzzy-matching logic. 
+  * Implement the progression states (Phonics -> CVC -> Sentences) and an initial tolerant matcher.
   * *Checkpoint:* The app is now fully functional. If everything else fails, this is your submission.
 * **Verification Checkpoint 2:** **Run `pytest test_backend.py` to verify Modal ASR and TTS endpoints return the correct JSON/bytes. Then, use `gradio.Client` to pass a test audio file through the full UI pipeline to confirm end-to-end integration.**
 
-## 3. Phase 2: The High-Risk Pivot (Days 5–6)
-*Goal: Chase the "Well-Tuned", "Off the Grid", and "Llama Champion" badges by moving compute to the edge.*
+## 3. Phase 2: The Fine-Tuned Evaluator (Days 5–6)
+*Goal: Secure the "Well-Tuned" badge and improve child-speech scoring with a published small model.*
 
 ### Day 5: The Modal Fine-Tuning Job
-* **Objective:** Secure the "Well-Tuned" badge and prepare for local deployment.
+* **Objective:** Secure the "Well-Tuned" badge and make reading evaluation more robust than strict ASR matching.
 * **Tasks:**
-  * Utilize Modal's A100 infrastructure to run a rapid fine-tuning job (e.g., fine-tuning a tiny LLM for better phonetic error correction or a TTS voice).
-  * Export the resulting model weights to the quantized GGUF format.
+  * Extract and manually verify a 50-word child-speech dataset.
+  * Run Cohere ASR over the cleaned utterances and record strict-match failures.
+  * Convert the results into binary phonetic-evaluator training data.
+  * Utilize Modal's A100 infrastructure to fine-tune MiniCPM with LoRA.
+  * Publish the resulting model to Hugging Face as `kingkw1/minicpm-phonetic-evaluator`.
+  * Document the result in `notebooks/01_dataset_preparation.ipynb` and `notebooks/02_post_tuning_evaluation.ipynb`.
+  * Expose `run_minicpm_evaluator` in `modal_inference.py`.
+  * Route non-exact app matches through a MiniCPM wrapper such as `ask_minicpm_judge`.
+  * Test deliberate mistakes such as "the dogs ran fast" against "the dog ran fast" to ensure the evaluator does not over-accept semantically different readings.
+  * Keep the legacy edit-distance matcher only as an explicitly documented fallback during transition.
+* **Verification Checkpoint 3:** **Run the post-tuning notebook and manually test close-but-wrong readings in the Gradio app. The demo should show both recovered child-speech variants and rejected wrong readings.**
 
 ### Day 6: The `llama.cpp` Edge Swap (Early Risk Test)
 * **Objective:** Test local runtime latency on the Hugging Face ZeroGPU.
@@ -39,7 +48,7 @@ This hackathon sprint is strictly time-boxed. The primary directive is to secure
   * Pull the custom GGUF models into the Hugging Face Space.
   * Use `llama-cpp-python` bindings to run the models locally.
   * **Crucial Decision Point:** If the local latency ruins the child's UX, immediately abandon this phase and revert to the Phase 1 Modal endpoints. 
-* **Verification Checkpoint 3:** **Deploy to the Hugging Face Space. Measure the round-trip latency of a single phonetic read attempt. If it takes longer than 2.5 seconds, trigger the rollback to Modal.**
+* **Verification Checkpoint 4:** **Deploy to the Hugging Face Space. Measure the round-trip latency of a single phonetic read attempt. If it takes longer than 2.5 seconds, trigger the rollback to Modal.**
 
 ## 4. Phase 3: Bells, Whistles & Submission (Days 7–9)
 *Goal: Polish the UI, gather real-world proof, and stack the final badges.*

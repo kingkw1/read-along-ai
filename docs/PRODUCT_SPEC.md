@@ -5,7 +5,7 @@ The application provides a guided, distraction-free reading experience that scal
 1. **Display:** The UI presents a target text (a letter, word, or sentence).
 2. **Listen:** The child presses "Record" and attempts to read the target text.
 3. **Evaluate (ASR):** The Cohere Transcribe model converts the audio to text.
-4. **Match:** The system applies fuzzy-matching logic to compare the ASR output against the target text.
+4. **Judge:** The system first checks for an exact normalized match, then uses the fine-tuned MiniCPM phonetic evaluator for close or ambiguous cases.
 5. **Feedback:** The system triggers a visual reward and proceeds, or uses OpenBMB VoxCPM to provide gentle verbal assistance.
 
 ## 2. Progression States
@@ -29,16 +29,13 @@ The application manages three distinct difficulty tiers tailored to specific cog
 * **Behavior:** The system evaluates word-by-word tracking.
 * **Assistance:** Clicking any individual word triggers VoxCPM to read just that word. Clicking a "Read to Me" button triggers VoxCPM to read the entire sentence with natural prosody.
 
-## 3. Fuzzy Matching & Evaluation Logic
-Children have developing articulation. Standard ASR will often misinterpret their speech. The evaluation logic must be highly tolerant to prevent frustration.
+## 3. Phonetic Evaluation Logic
+Children have developing articulation. Standard ASR will often misinterpret their speech, and strict string matching can turn an acceptable read attempt into a discouraging failure. The target evaluation stack is therefore:
 
-* **Phonetic Aliasing (Level 1 & 2):** Create a dictionary of acceptable ASR misinterpretations for early sounds.
-    * *Example:* Target "C". Acceptable ASR returns: "see", "sea", "si", "c".
-    * *Example:* Target "M". Acceptable ASR returns: "em", "am", "um", "m".
-* **Levenshtein Distance (Level 2 & 3):** Apply a string-matching algorithm with a tolerance threshold.
-    * For a 3-letter target word, accept an ASR output with a Levenshtein distance of 1 (e.g., Target: "cat", ASR output: "cap" -> Accept as correct to maintain flow).
-* **Filler Word Stripping:** Automatically strip common hesitations from the ASR string before evaluation (remove "um", "uh", "like", "the").
-* **Substring Matching (Level 3):** If the target sentence is "The dog ran fast," and the ASR outputs "dog ran fast," mark the attempt as successful. Do not penalize skipped sight words if the core nouns/verbs are captured.
+* **Exact Normalized Match:** Strip punctuation and casing. If the transcript exactly matches the target text after normalization, accept immediately.
+* **Fine-Tuned MiniCPM Judge:** If the exact match fails, call the published MiniCPM evaluator (`kingkw1/minicpm-phonetic-evaluator`) with the target text and ASR transcript. The model returns `True` when the transcript is an acceptable phonetic match and `False` when the child likely said the wrong thing.
+* **Legacy Fallback During Integration:** The current feature branch still contains earlier Levenshtein/alias matching in `app.py`. This is useful for local experimentation, but the product direction is to replace broad edit-distance acceptance with the tuned MiniCPM judge because examples like "the dogs ran fast" can otherwise be accepted too easily.
+* **Decision Boundary:** The judge should accept child-speech variants such as lisps, slow articulation, or harmless ASR phrasing, while rejecting unrelated speech, skipped target content, or semantically different words.
 
 ## 4. Reward & Feedback Mechanism
 The app must provide immediate, positive reinforcement without overwhelming the UI.
@@ -47,7 +44,7 @@ The app must provide immediate, positive reinforcement without overwhelming the 
     * *Audio:* VoxCPM triggers a short, randomized positive affirmation ("Great job!", "You got it!", "Awesome!").
     * *Action:* Automatically loads the next target text after a 2-second delay.
 * **Struggle State (3 Failed Attempts):**
-    * If the fuzzy-match fails three consecutive times on the same target, the system gently intervenes to prevent frustration.
+    * If the evaluator rejects three consecutive attempts on the same target, the system gently intervenes to prevent frustration.
     * *Audio:* VoxCPM automatically reads the word out loud ("Let's try this together...").
 * **On-Demand Assistance:**
     * Triggered exclusively by the child clicking the text block.
