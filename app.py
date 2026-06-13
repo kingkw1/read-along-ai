@@ -12,6 +12,7 @@ import io
 import inspect
 import json
 import logging
+import os
 import re
 import tempfile
 import threading
@@ -74,6 +75,11 @@ def _modal_function(function_name: str):
     if lookup is not None:
         return lookup(MODAL_APP_NAME, function_name)
     return modal.Function.from_name(MODAL_APP_NAME, function_name)
+
+
+def modal_credentials_available() -> bool:
+    """Return whether the Space has enough Modal credentials to call endpoints."""
+    return bool(os.environ.get("MODAL_TOKEN_ID") and os.environ.get("MODAL_TOKEN_SECRET"))
 
 
 def run_cohere_asr(audio_bytes: bytes) -> dict[str, str]:
@@ -469,6 +475,15 @@ def prewarm_level_words(sentence: str, engine_mode: str) -> None:
                 TTS_PREWARM_STATUS["running"] = False
         return
 
+    if engine_mode == TURBO_ENGINE and not modal_credentials_available():
+        with TTS_CACHE_LOCK:
+            if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                TTS_PREWARM_STATUS["failed"] = int(TTS_PREWARM_STATUS.get("failed", 0)) + len(missing_words)
+                TTS_PREWARM_STATUS["running"] = False
+                TTS_PREWARM_STATUS["fallback_reason"] = "Modal credentials are not configured in the Space."
+        LOGGER.info("Skipping Modal word voice prewarm because Modal credentials are not configured")
+        return
+
     try:
         sentence_audio = synthesize_speech_bytes(sentence, engine_mode)
         method_report: dict[str, str] = {}
@@ -511,11 +526,11 @@ def start_prewarm_level_words(sentence: str, engine_mode: str) -> None:
     threading.Thread(target=prewarm_level_words, args=(sentence, engine_mode), daemon=True).start()
 
 
-def start_word_voice_prewarm(sentence: str) -> tuple[str, str]:
+def start_word_voice_prewarm(sentence: str, engine_mode: str = TURBO_ENGINE) -> tuple[str, str]:
     words = sentence_tts_words(sentence)
     _initialize_prewarm_status(sentence, words)
     if words:
-        start_prewarm_level_words(sentence, LOCAL_ENGINE)
+        start_prewarm_level_words(sentence, engine_mode)
     return current_tts_status()
 
 
@@ -659,14 +674,14 @@ def evaluate_reading(audio_filepath: str, current_index: int, inference_engine: 
 
 def prewarm_current_level(current_index: int, inference_engine: str = TURBO_ENGINE) -> tuple[str, str]:
     sentence = CURRICULUM[int(current_index) % len(CURRICULUM)]
-    return start_word_voice_prewarm(sentence)
+    return start_word_voice_prewarm(sentence, inference_engine)
 
 
 def next_sentence(idx: int, inference_engine: str = TURBO_ENGINE) -> tuple[int, str, None, str, None, None, str, str, str]:
     """Advance to the next curriculum sentence and clear transient outputs."""
     next_index = (int(idx) + 1) % len(CURRICULUM)
     next_level_sentence = CURRICULUM[next_index]
-    tts_status, ready_words = start_word_voice_prewarm(next_level_sentence)
+    tts_status, ready_words = start_word_voice_prewarm(next_level_sentence, inference_engine)
     return next_index, render_reading_canvas(next_level_sentence), None, hidden_feedback(), None, None, tts_status, ready_words, ""
 
 
@@ -966,7 +981,7 @@ FRONTEND_JS = """
 
 
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="Read-Along AI", css=CUSTOM_CSS, head=CONFETTI_SCRIPT + FRONTEND_JS) as demo:
+    with gr.Blocks(title="Read-Along AI") as demo:
         current_index = gr.State(0)
         prewarm_timer = gr.Timer(1)
 

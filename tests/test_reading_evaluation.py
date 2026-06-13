@@ -80,7 +80,12 @@ def test_evaluate_reading_retries_minicpm_false_verdict(monkeypatch) -> None:
 
 
 def test_next_sentence_cycles_curriculum_clears_outputs_and_starts_word_prewarm(monkeypatch) -> None:
-    monkeypatch.setattr(app, "start_prewarm_level_words", lambda _sentence, _engine: None)
+    prewarm_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        app,
+        "start_prewarm_level_words",
+        lambda sentence, engine: prewarm_calls.append((sentence, engine)),
+    )
 
     (
         next_index,
@@ -92,7 +97,7 @@ def test_next_sentence_cycles_curriculum_clears_outputs_and_starts_word_prewarm(
         tts_status,
         ready_audio,
         success_trigger,
-    ) = app.next_sentence(3)
+    ) = app.next_sentence(3, app.TURBO_ENGINE)
 
     assert next_index == 0
     assert "The" in sentence_html
@@ -104,6 +109,63 @@ def test_next_sentence_cycles_curriculum_clears_outputs_and_starts_word_prewarm(
     assert "Getting word voices ready... 0/3" in tts_status
     assert json.loads(ready_audio) == {}
     assert success_trigger == ""
+    assert prewarm_calls == [("The cat sat.", app.TURBO_ENGINE)]
+
+
+def test_prewarm_current_level_uses_selected_engine(monkeypatch) -> None:
+    prewarm_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        app,
+        "start_prewarm_level_words",
+        lambda sentence, engine: prewarm_calls.append((sentence, engine)),
+    )
+
+    tts_status, ready_audio = app.prewarm_current_level(1, app.TURBO_ENGINE)
+
+    assert "Getting word voices ready... 0/4" in tts_status
+    assert json.loads(ready_audio) == {}
+    assert prewarm_calls == [("The dog ran fast.", app.TURBO_ENGINE)]
+
+
+def test_prewarm_level_words_skips_modal_without_credentials(monkeypatch, caplog) -> None:
+    monkeypatch.delenv("MODAL_TOKEN_ID", raising=False)
+    monkeypatch.delenv("MODAL_TOKEN_SECRET", raising=False)
+    monkeypatch.setattr(
+        app,
+        "synthesize_speech_bytes",
+        lambda _sentence, _engine: pytest.fail("missing Modal credentials should not call TTS"),
+    )
+
+    with caplog.at_level("INFO", logger=app.LOGGER.name):
+        app.prewarm_level_words("The cat sat.", app.TURBO_ENGINE)
+
+    assert app.TTS_PREWARM_STATUS["running"] is False
+    assert app.TTS_PREWARM_STATUS["failed"] == 3
+    assert "Modal credentials are not configured" in app.TTS_PREWARM_STATUS["fallback_reason"]
+    assert "Skipping Modal word voice prewarm" in caplog.text
+
+
+def test_prewarm_level_words_uses_modal_when_credentials_exist(monkeypatch) -> None:
+    monkeypatch.setenv("MODAL_TOKEN_ID", "token-id")
+    monkeypatch.setenv("MODAL_TOKEN_SECRET", "token-secret")
+    calls: list[tuple[str, str]] = []
+
+    def fake_synthesize_bytes(sentence: str, engine: str) -> bytes:
+        calls.append((sentence, engine))
+        return silent_wav_bytes(seconds=1.2)
+
+    monkeypatch.setattr(app, "synthesize_speech_bytes", fake_synthesize_bytes)
+    monkeypatch.setattr(
+        app,
+        "signal_word_timestamps",
+        lambda _sentence, _audio_bytes: {"the": (0.0, 0.25), "cat": (0.35, 0.65), "sat": (0.75, 1.1)},
+    )
+
+    app.prewarm_level_words("The cat sat.", app.TURBO_ENGINE)
+
+    assert calls == [("The cat sat.", app.TURBO_ENGINE)]
+    assert app.TTS_PREWARM_STATUS["running"] is False
+    assert app.TTS_PREWARM_STATUS["failed"] == 0
 
 
 def test_reading_canvas_uses_browser_tts_for_word_clicks() -> None:
