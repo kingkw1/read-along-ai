@@ -21,7 +21,7 @@ from typing import Optional
 import gradio as gr
 import modal
 
-from local_inference import local_ask_minicpm_judge, local_synthesize_speech, local_transcribe_audio
+from local_inference import _load_whisper_model, local_ask_minicpm_judge, local_synthesize_speech, local_transcribe_audio
 
 MODAL_APP_NAME = "read-along-ai-inference"
 TURBO_ENGINE = "⚡ Turbo Mode (Modal)"
@@ -170,6 +170,105 @@ def _write_wav_clip(params: wave._wave_params, frames: bytes) -> bytes:
     return output.getvalue()
 
 
+def _slice_wav_by_seconds(audio_bytes: bytes, start_seconds: float, end_seconds: float) -> Optional[bytes]:
+    """Return a WAV clip for a timestamp range, padded and clamped to the source audio."""
+    with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
+        params = wav_file.getparams()
+        total_frames = wav_file.getnframes()
+        all_frames = wav_file.readframes(total_frames)
+
+    if total_frames <= 0 or end_seconds <= start_seconds:
+        return None
+
+    padding_frames = int(params.framerate * WORD_CLIP_PADDING_SECONDS)
+    start_frame = max(0, int(start_seconds * params.framerate) - padding_frames)
+    end_frame = min(total_frames, int(end_seconds * params.framerate) + padding_frames)
+    if end_frame <= start_frame:
+        return None
+
+    bytes_per_frame = params.nchannels * params.sampwidth
+    return _write_wav_clip(params, all_frames[start_frame * bytes_per_frame : end_frame * bytes_per_frame])
+
+
+def align_sentence_audio_words(sentence: str, audio_bytes: bytes) -> dict[str, tuple[float, float]]:
+    """Align generated sentence audio to target words using local faster-whisper word timestamps.
+
+    The generated sentence is known, so this accepts only sequential timestamp
+    matches for every unique target word. Any mismatch, missing timestamp, or
+    obviously unusable boundary raises ``ValueError`` so callers can use the
+    proportional slicer fallback.
+    """
+    target_words = sentence_tts_words(sentence)
+    if not target_words:
+        return {}
+
+    audio_path = write_tts_audio_file("alignment_sentence", audio_bytes)
+    model = _load_whisper_model()
+    segments, _info = model.transcribe(
+        audio_path,
+        language="en",
+        beam_size=1,
+        vad_filter=False,
+        word_timestamps=True,
+        condition_on_previous_text=False,
+    )
+
+    recognized_words: list[tuple[str, float, float]] = []
+    for segment in segments:
+        for word_info in getattr(segment, "words", []) or []:
+            word = clean_tts_word(getattr(word_info, "word", ""))
+            start = getattr(word_info, "start", None)
+            end = getattr(word_info, "end", None)
+            probability = getattr(word_info, "probability", None)
+            if not word or start is None or end is None:
+                continue
+            if probability is not None and float(probability) < 0.2:
+                continue
+            recognized_words.append((word, float(start), float(end)))
+
+    audio_duration = wav_duration_seconds(audio_bytes)
+    timestamps: dict[str, tuple[float, float]] = {}
+    search_index = 0
+    for target_word in target_words:
+        while search_index < len(recognized_words) and recognized_words[search_index][0] != target_word:
+            search_index += 1
+        if search_index >= len(recognized_words):
+            raise ValueError(f"missing aligned word timestamp for {target_word!r}")
+
+        _word, start, end = recognized_words[search_index]
+        search_index += 1
+        if start < 0 or end <= start or end > audio_duration + WORD_CLIP_PADDING_SECONDS:
+            raise ValueError(f"unusable aligned timestamp for {target_word!r}: {start}-{end}")
+        timestamps.setdefault(target_word, (start, min(end, audio_duration)))
+
+    return timestamps
+
+
+def slice_sentence_audio_by_timestamps(
+    sentence: str, audio_bytes: bytes, word_timestamps: dict[str, tuple[float, float]]
+) -> dict[str, bytes]:
+    """Slice sentence WAV bytes into word clips from exact timestamp boundaries."""
+    clips: dict[str, bytes] = {}
+    for word in sentence_tts_words(sentence):
+        timestamp = word_timestamps.get(word)
+        if timestamp is None:
+            raise ValueError(f"missing timestamp for {word!r}")
+        clip = _slice_wav_by_seconds(audio_bytes, timestamp[0], timestamp[1])
+        if clip is None:
+            raise ValueError(f"invalid timestamp for {word!r}")
+        clips.setdefault(word, clip)
+    return clips
+
+
+def slice_sentence_audio_with_alignment_or_fallback(sentence: str, audio_bytes: bytes) -> dict[str, bytes]:
+    """Prefer local word alignment for clips, falling back to proportional slicing on failure."""
+    try:
+        timestamps = align_sentence_audio_words(sentence, audio_bytes)
+        return slice_sentence_audio_by_timestamps(sentence, audio_bytes, timestamps)
+    except Exception:
+        return slice_sentence_audio_by_words(sentence, audio_bytes)
+
+
 def slice_sentence_audio_by_words(sentence: str, audio_bytes: bytes) -> dict[str, bytes]:
     """Approximate word clips by splitting sentence audio by word character weight."""
     words = sentence_tts_words(sentence)
@@ -238,7 +337,7 @@ def prewarm_level_words(sentence: str, engine_mode: str) -> None:
 
     try:
         sentence_audio = synthesize_speech_bytes(sentence, engine_mode)
-        word_clips = slice_sentence_audio_by_words(sentence, sentence_audio)
+        word_clips = slice_sentence_audio_with_alignment_or_fallback(sentence, sentence_audio)
     except Exception:
         with TTS_CACHE_LOCK:
             if TTS_PREWARM_STATUS.get("sentence") == sentence:

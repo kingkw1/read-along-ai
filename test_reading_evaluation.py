@@ -180,6 +180,42 @@ def test_slice_sentence_audio_by_words_returns_valid_weighted_word_clips() -> No
         assert app.wav_duration_seconds(audio_bytes) > 0
 
 
+def test_slice_sentence_audio_by_timestamps_returns_valid_wav_clips() -> None:
+    clips = app.slice_sentence_audio_by_timestamps(
+        "The cat sat.",
+        silent_wav_bytes(seconds=1.2),
+        {"the": (0.0, 0.25), "cat": (0.35, 0.65), "sat": (0.75, 1.1)},
+    )
+
+    assert list(clips) == ["the", "cat", "sat"]
+    assert app.wav_duration_seconds(clips["the"]) > 0.25
+    assert app.wav_duration_seconds(clips["cat"]) > 0.30
+    assert all(audio_bytes.startswith(b"RIFF") for audio_bytes in clips.values())
+
+
+def test_alignment_slicer_falls_back_to_proportional_when_alignment_fails(monkeypatch) -> None:
+    audio_bytes = silent_wav_bytes(seconds=1.2)
+    fallback_clips = {"the": b"fallback-the"}
+
+    monkeypatch.setattr(
+        app,
+        "align_sentence_audio_words",
+        lambda _sentence, _audio_bytes: (_ for _ in ()).throw(ValueError("alignment failed")),
+    )
+    monkeypatch.setattr(app, "slice_sentence_audio_by_words", lambda _sentence, _audio_bytes: fallback_clips)
+
+    assert app.slice_sentence_audio_with_alignment_or_fallback("The cat sat.", audio_bytes) == fallback_clips
+
+
+def test_slice_sentence_audio_by_timestamps_rejects_missing_partial_timestamps() -> None:
+    with pytest.raises(ValueError, match="missing timestamp"):
+        app.slice_sentence_audio_by_timestamps(
+            "The cat sat.",
+            silent_wav_bytes(seconds=1.2),
+            {"the": (0.0, 0.25), "cat": (0.35, 0.65)},
+        )
+
+
 def test_prewarm_level_words_generates_sentence_once_and_caches_word_clips(monkeypatch) -> None:
     calls: list[tuple[str, str]] = []
 
@@ -188,6 +224,11 @@ def test_prewarm_level_words_generates_sentence_once_and_caches_word_clips(monke
         return silent_wav_bytes(seconds=1.2)
 
     monkeypatch.setattr(app, "synthesize_speech_bytes", fake_synthesize_bytes)
+    monkeypatch.setattr(
+        app,
+        "align_sentence_audio_words",
+        lambda _sentence, _audio_bytes: {"the": (0.0, 0.25), "cat": (0.35, 0.65), "sat": (0.75, 1.1)},
+    )
 
     app.prewarm_level_words("The cat sat. The cat!", app.LOCAL_ENGINE)
 
