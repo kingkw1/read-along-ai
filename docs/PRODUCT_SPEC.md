@@ -4,9 +4,11 @@
 The application provides a guided, distraction-free reading experience that scales in complexity. The central loop is:
 1. **Display:** The UI presents a target text (a letter, word, or sentence).
 2. **Listen:** The child presses "Record" and attempts to read the target text.
-3. **Evaluate (ASR):** The Cohere Transcribe model converts the audio to text.
+3. **Evaluate (ASR):** An ASR model (Cohere or faster-whisper) converts the audio to text.
 4. **Judge:** The system first checks for an exact normalized match, then uses the fine-tuned MiniCPM phonetic evaluator for close or ambiguous cases.
-5. **Feedback:** The system triggers a visual reward and proceeds, or uses OpenBMB VoxCPM to provide gentle verbal assistance.
+5. **Feedback:** The system triggers a visual reward and proceeds, or uses VoxCPM to provide gentle verbal assistance.
+
+*Note: The user can toggle between "Turbo Mode" (Modal Cloud APIs) and "Off the Grid Mode" (Local Inference) to control where these models execute.*
 
 ## 2. Progression States
 The application manages three distinct difficulty tiers tailored to specific cognitive milestones.

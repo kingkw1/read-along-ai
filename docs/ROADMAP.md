@@ -41,14 +41,16 @@ This hackathon sprint is strictly time-boxed. The primary directive is to secure
   * Keep the legacy edit-distance matcher only as an explicitly documented fallback during transition.
 * **Verification Checkpoint 3:** **Run the post-tuning notebook and manually test close-but-wrong readings in the Gradio app. The demo should show both recovered child-speech variants and rejected wrong readings.**
 
-### Day 6: The `llama.cpp` Edge Swap (Early Risk Test)
-* **Objective:** Test local runtime latency on the Hugging Face ZeroGPU.
+### Day 6: The Dual-Mode Hybrid Engine (Edge Integration)
+* **Objective:** Secure the "Off the Grid" and "Llama Champion" badges while protecting the demo UX.
 * **Tasks:**
-  * Isolate the Modal wrapper functions in `app.py`.
-  * Pull the custom GGUF models into the Hugging Face Space.
-  * Use `llama-cpp-python` bindings to run the models locally.
-  * **Crucial Decision Point:** If the local latency ruins the child's UX, immediately abandon this phase and revert to the Phase 1 Modal endpoints. 
-* **Verification Checkpoint 4:** **Deploy to the Hugging Face Space. Measure the round-trip latency of a single phonetic read attempt. If it takes longer than 2.5 seconds, trigger the rollback to Modal.**
+  * Implement a Dual-Mode Toggle in `app.py` (`⚡ Turbo Mode` vs `🏕️ Off the Grid Mode`).
+  * Create `local_inference.py` to house the local execution logic.
+  * Integrate `faster-whisper` (tiny.en) for local ASR.
+  * Use `llama-cpp-python` bindings to load the quantized MiniCPM evaluator locally.
+  * Load VoxCPM via local PyTorch/ONNX.
+  * Wire the toggle to route to either `modal_inference.py` or `local_inference.py`.
+* **Verification Checkpoint 4:** **Deploy to the Hugging Face Space. Flip the toggle to "Off the Grid Mode" and manually verify that a read attempt executes completely locally without calling Modal APIs.**
 
 ## 4. Phase 3: Bells, Whistles & Submission (Days 7–9)
 *Goal: Polish the UI, gather real-world proof, and stack the final badges.*
