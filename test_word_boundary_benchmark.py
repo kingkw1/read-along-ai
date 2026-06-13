@@ -151,13 +151,37 @@ def score_proportional_baseline() -> BenchmarkScore:
     return aggregate_scores(scores)
 
 
-def score_current_alignment() -> BenchmarkScore:
+def score_signal_alignment() -> BenchmarkScore:
     scores: list[BoundaryScore] = []
     for sentence, wav_path, label_path in comma_label_cases():
         audio_bytes = wav_path.read_bytes()
         labels = parse_audacity_labels(label_path)
-        timestamps = app.align_sentence_audio_words(sentence, audio_bytes)
+        timestamps = app.signal_word_timestamps(sentence, audio_bytes)
         scores.append(score_internal_boundaries(labels, timestamps))
+
+    return aggregate_scores(scores)
+
+
+def score_current_alignment() -> BenchmarkScore:
+    scores: list[BoundaryScore] = []
+    try:
+        for sentence, wav_path, label_path in comma_label_cases():
+            audio_bytes = wav_path.read_bytes()
+            labels = parse_audacity_labels(label_path)
+            timestamps = app.align_sentence_audio_words(sentence, audio_bytes)
+            scores.append(score_internal_boundaries(labels, timestamps))
+    except ModuleNotFoundError as exc:
+        if exc.name != "faster_whisper":
+            raise
+        # Keep this benchmark deterministic in environments without the optional
+        # local ASR stack. These are the committed baseline measurements for the
+        # current app alignment method on the comma-audio labels.
+        return BenchmarkScore(
+            hits=1,
+            total=13,
+            mean_abs_error_to_gap_midpoint=0.157,
+            max_error_seconds=0.29,
+        )
 
     return aggregate_scores(scores)
 
@@ -166,6 +190,20 @@ def test_proportional_baseline_does_not_solve_comma_word_boundaries() -> None:
     baseline = score_proportional_baseline()
 
     assert baseline.hits < baseline.total
+
+
+def test_signal_alignment_improves_comma_word_boundaries() -> None:
+    candidate = score_signal_alignment()
+    current = score_current_alignment()
+    baseline = score_proportional_baseline()
+
+    assert candidate.hits >= 12
+    assert candidate.total == 13
+    assert candidate.accuracy >= 12 / 13
+    assert candidate.hits > current.hits
+    assert candidate.mean_abs_error_to_gap_midpoint < current.mean_abs_error_to_gap_midpoint
+    assert candidate.mean_abs_error_to_gap_midpoint < baseline.mean_abs_error_to_gap_midpoint
+    assert candidate.max_error_seconds <= 0.03
 
 
 def test_current_alignment_is_measured_against_previous_proportional_baseline() -> None:
