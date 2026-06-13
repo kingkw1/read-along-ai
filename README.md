@@ -47,7 +47,7 @@ For a deep dive into the architecture and development plan, please review our sp
 * **Frontend:** A custom, gamified Gradio interface ("Off-Brand" UI) built for legibility and young readers.
 * **ASR (Speech-to-Text):** **Cohere Transcribe** (2B parameters). Optimized for low-latency voice capture to process the child's reading attempts instantly.
 * **TTS (Text-to-Speech):** **OpenBMB VoxCPM** (*[Insert Parameter Count]*). This acts as the **central interactive component** of the app, driving the core feedback loop, stepping in during "Struggle States," and providing on-demand phonemic assistance.
-* **Compute / Inference:** Deployed via **Modal** serverless endpoints to guarantee zero-latency responses during the frontend interaction.
+* **Compute / Inference:** Utilizes a **Dual-Mode Hybrid Architecture**. The app defaults to **Modal** serverless endpoints for zero-latency interactions but includes an "Off the Grid" toggle to run entirely on local Hugging Face Space resources.
 
 ## 🏆 Hackathon Eligibility & Attributions
 
@@ -61,13 +61,15 @@ This entire application, including the Gradio UI and backend Modal logic, was or
 * *Note to Judges: Please see the commit history for automated Codex attributions.*
 
 ### Modal Compute Awards
-The high-speed inference endpoints powering the Cohere and OpenBMB models are hosted entirely on **Modal**. This provides the necessary sub-second response times required to keep a young child focused. *(Note: Our Roadmap outlines utilizing Modal A100s for a rapid fine-tuning job and then attempting a swap to local `llama.cpp` during Phase 2 to capture the Well-Tuned and local execution badges).*
+The high-speed inference endpoints powering the primary "Turbo Mode" are hosted entirely on **Modal**. This provides the necessary sub-second response times required to keep a young child focused. We also utilized Modal A100s for a rapid fine-tuning job to train the phonetic evaluator model.
 
 ### Badges Claimed (Bonus Quest Champion Strategy)
 * 🏅 **Off-Brand:** The default Gradio UI has been completely overhauled with custom CSS to create a distraction-free, gamified experience for early learners.
 * 🏅 **Well-Tuned:** *[Insert Hugging Face Link to the fine-tuned model created during Phase 2]*
 * 🏅 **Tiny Titan:** Every individual model used in this pipeline (and their combined footprint) is strictly under the 4B parameter threshold.
-  * *Parameter Math:* Cohere Transcribe (2B) + OpenBMB VoxCPM (0.5B) = ***2.5B Total Parameters***.
+  * *Parameter Math:* Cohere Transcribe/faster-whisper (2B / 0.04B) + OpenBMB VoxCPM (0.5B) + MiniCPM Evaluator (2.4B) = ***2.9B Total Parameters***.
+* 🏅 **Off the Grid:** The app includes a UI toggle that disconnects from Modal and runs `faster-whisper`, `llama.cpp`, and VoxCPM entirely locally inside the Hugging Face Space.
+* 🏅 **Llama Champion:** The local phonetic evaluator runs exclusively through `llama-cpp-python`.
 * 🏅 **Sharing is Caring:** *[Insert Hugging Face Dataset Link to Codex Agent Traces]*
 * 🏅 **Field Notes:** *[Insert Link to Blog Post / Medium Article]*
 

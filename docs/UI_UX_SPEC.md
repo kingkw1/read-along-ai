@@ -17,6 +17,9 @@ Codex must inject the following CSS rules to override the default Gradio theme:
 ## 3. Component Layout & Structure
 The app should utilize a single-column, centered layout (`gr.Column(elem_classes="main-container")`). 
 
+### Header: The Architecture Toggle
+* **Mode Switch:** A small, unobtrusive `gr.Radio` or `gr.Dropdown` at the top allowing the user to select between `⚡ Turbo Mode (Modal)` and `🏕️ Off the Grid Mode (Local)`. This controls whether the backend endpoints execute locally or in the cloud.
+
 ### Top: The Reading Canvas (`gr.HTML`)
 * **Do NOT use `gr.Textbox`** for the target words/sentences. 
 * To allow the child to click individual words for audio assistance, the text must be rendered dynamically via `gr.HTML`.
