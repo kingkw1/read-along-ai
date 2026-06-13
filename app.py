@@ -7,6 +7,7 @@ implementation can be swapped without changing frontend event wiring.
 from __future__ import annotations
 
 import html
+import inspect
 import re
 import tempfile
 import wave
@@ -16,7 +17,12 @@ from typing import Optional
 import gradio as gr
 import modal
 
+from local_inference import local_ask_minicpm_judge, local_synthesize_speech, local_transcribe_audio
+
 MODAL_APP_NAME = "read-along-ai-inference"
+TURBO_ENGINE = "⚡ Turbo Mode (Modal)"
+LOCAL_ENGINE = "🏕️ Off the Grid Mode (Local)"
+INFERENCE_ENGINES = [TURBO_ENGINE, LOCAL_ENGINE]
 
 TARGET_SENTENCES = [
     "The dog ran fast.",
@@ -74,9 +80,12 @@ def run_minicpm_evaluator(target_text: str, transcript: str) -> str:
 # ---------------------------------------------------------------------------
 # Backend abstraction layer required by docs/API_CONTRACT_SPEC.md.
 # ---------------------------------------------------------------------------
-def transcribe_audio(audio_filepath: str) -> str:
+def transcribe_audio(audio_filepath: str, inference_engine: str = TURBO_ENGINE) -> str:
     """Return a clean transcription for a local microphone recording."""
     try:
+        if inference_engine == LOCAL_ENGINE:
+            return local_transcribe_audio(audio_filepath)
+
         audio_bytes = Path(audio_filepath).read_bytes()
         result = run_cohere_asr(audio_bytes)
         if result.get("status") != "success":
@@ -86,9 +95,12 @@ def transcribe_audio(audio_filepath: str) -> str:
         return "[ASR_ERROR]"
 
 
-def synthesize_speech(target_text: str) -> Optional[str]:
+def synthesize_speech(target_text: str, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
     """Return a local WAV path for generated speech."""
     try:
+        if inference_engine == LOCAL_ENGINE:
+            return local_synthesize_speech(target_text)
+
         audio_bytes = run_voxcpm_tts(target_text)
         safe_label = "".join(ch for ch in target_text.lower() if ch.isalnum() or ch in ("-", "_"))[:24] or "speech"
         output_path = Path(tempfile.gettempdir()) / f"read_along_{safe_label}.wav"
@@ -103,9 +115,12 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", "".join(ch.lower() for ch in text if ch.isalnum() or ch.isspace())).strip()
 
 
-def ask_minicpm_judge(target_text: str, transcript: str) -> bool:
+def ask_minicpm_judge(target_text: str, transcript: str, inference_engine: str = TURBO_ENGINE) -> bool:
     """Ask the fine-tuned MiniCPM evaluator whether the reading is acceptable."""
     try:
+        if inference_engine == LOCAL_ENGINE:
+            return local_ask_minicpm_judge(target_text, transcript)
+
         verdict = str(run_minicpm_evaluator(target_text, transcript)).strip().casefold()
     except Exception:
         return False
@@ -167,18 +182,33 @@ def retry_feedback() -> str:
     """
 
 
-def evaluate_reading(audio_filepath: str, current_index: int) -> tuple[str, Optional[str]]:
+def _call_with_engine(function, *args, inference_engine: str):
+    try:
+        signature = inspect.signature(function)
+    except (TypeError, ValueError):
+        return function(*args, inference_engine)
+
+    accepts_varargs = any(parameter.kind == inspect.Parameter.VAR_POSITIONAL for parameter in signature.parameters.values())
+    if accepts_varargs or len(signature.parameters) > len(args):
+        return function(*args, inference_engine)
+    return function(*args)
+
+
+def evaluate_reading(audio_filepath: str, current_index: int, inference_engine: str = TURBO_ENGINE) -> tuple[str, Optional[str]]:
     """Evaluate one read attempt and return feedback HTML plus optional praise audio."""
-    transcript = transcribe_audio(audio_filepath)
+    transcript = _call_with_engine(transcribe_audio, audio_filepath, inference_engine=inference_engine)
     target_sentence = TARGET_SENTENCES[current_index]
-    print(f"[read-along] target={target_sentence!r} transcript={transcript!r}", flush=True)
+    print(
+        f"[read-along] engine={inference_engine!r} target={target_sentence!r} transcript={transcript!r}",
+        flush=True,
+    )
 
     if transcript == "[ASR_ERROR]":
         return retry_feedback(), None
 
     exact_match = normalize_text(transcript) == normalize_text(target_sentence)
-    if exact_match or ask_minicpm_judge(target_sentence, transcript):
-        praise_audio = synthesize_speech("Amazing reading!")
+    if exact_match or _call_with_engine(ask_minicpm_judge, target_sentence, transcript, inference_engine=inference_engine):
+        praise_audio = _call_with_engine(synthesize_speech, "Amazing reading!", inference_engine=inference_engine)
         return success_feedback(), praise_audio
 
     return retry_feedback(), None
@@ -190,12 +220,12 @@ def next_sentence(current_index: int) -> tuple[int, str, str]:
     return next_index, render_reading_canvas(TARGET_SENTENCES[next_index]), hidden_feedback()
 
 
-def listen_to_sentence(current_index: int) -> Optional[str]:
-    return synthesize_speech(TARGET_SENTENCES[current_index])
+def listen_to_sentence(current_index: int, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
+    return synthesize_speech(TARGET_SENTENCES[current_index], inference_engine)
 
 
-def listen_to_word(word: str) -> Optional[str]:
-    return synthesize_speech(word or "word")
+def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
+    return synthesize_speech(word or "word", inference_engine)
 
 
 CUSTOM_CSS = """
@@ -397,6 +427,12 @@ def build_app() -> gr.Blocks:
 
         gr.HTML('<h1 class="app-title">Read-Along AI</h1>')
         with gr.Column(elem_classes="main-container"):
+            inference_engine = gr.Radio(
+                choices=INFERENCE_ENGINES,
+                value=TURBO_ENGINE,
+                label="Inference Engine",
+                elem_classes="engine-toggle",
+            )
             reading_canvas = gr.HTML(render_reading_canvas(TARGET_SENTENCES[0]))
 
             with gr.Column(elem_classes="interaction-zone"):
@@ -424,7 +460,7 @@ def build_app() -> gr.Blocks:
             show_progress="hidden",
         ).then(
             fn=evaluate_reading,
-            inputs=[microphone, sentence_index],
+            inputs=[microphone, sentence_index, inference_engine],
             outputs=[feedback_display, speech_output],
         )
 
@@ -436,13 +472,13 @@ def build_app() -> gr.Blocks:
 
         listen_button.click(
             fn=listen_to_sentence,
-            inputs=sentence_index,
+            inputs=[sentence_index, inference_engine],
             outputs=speech_output,
         )
 
         word_click_submit.click(
             fn=listen_to_word,
-            inputs=word_click_target,
+            inputs=[word_click_target, inference_engine],
             outputs=speech_output,
             show_progress="hidden",
         )
