@@ -293,40 +293,36 @@ def slice_sentence_audio_with_alignment_or_fallback(
 
 def slice_sentence_audio_by_words(sentence: str, audio_bytes: bytes) -> dict[str, bytes]:
     """Approximate word clips by splitting sentence audio by word character weight."""
+    timestamps = proportional_word_timestamps(sentence, audio_bytes)
+    return slice_sentence_audio_by_timestamps(sentence, audio_bytes, timestamps)
+
+
+def proportional_word_timestamps(sentence: str, audio_bytes: bytes) -> dict[str, tuple[float, float]]:
+    """Approximate word timestamps by splitting sentence audio by word character weight."""
     words = sentence_tts_words(sentence)
     if not words:
         return {}
 
     with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
-        params = wav_file.getparams()
         total_frames = wav_file.getnframes()
-        all_frames = wav_file.readframes(total_frames)
+        frame_rate = wav_file.getframerate()
 
     if total_frames <= 0:
         return {}
 
-    bytes_per_frame = params.nchannels * params.sampwidth
     weights = [max(len(word), 1) for word in words]
     total_weight = sum(weights)
-    padding_frames = int(params.framerate * WORD_CLIP_PADDING_SECONDS)
 
-    clips: dict[str, bytes] = {}
+    timestamps: dict[str, tuple[float, float]] = {}
     elapsed_weight = 0
     for word, weight in zip(words, weights):
         start_frame = int(total_frames * elapsed_weight / total_weight)
         elapsed_weight += weight
         end_frame = int(total_frames * elapsed_weight / total_weight)
+        if end_frame > start_frame:
+            timestamps.setdefault(word, (start_frame / frame_rate, end_frame / frame_rate))
 
-        padded_start = max(0, start_frame - padding_frames)
-        padded_end = min(total_frames, end_frame + padding_frames)
-        if padded_end <= padded_start:
-            continue
-
-        start_byte = padded_start * bytes_per_frame
-        end_byte = padded_end * bytes_per_frame
-        clips.setdefault(word, _write_wav_clip(params, all_frames[start_byte:end_byte]))
-
-    return clips
+    return timestamps
 
 
 def _initialize_prewarm_status(sentence: str, words: list[str]) -> None:
