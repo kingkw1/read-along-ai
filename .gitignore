@@ -7,3 +7,5 @@ __pycache__/
 .env.*
 *.ogg
 *.csv
+models/
+third_party/llama.cpp/
