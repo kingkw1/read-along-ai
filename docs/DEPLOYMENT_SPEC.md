@@ -36,6 +36,21 @@ Heavy Modal-side dependencies remain defined in `modal_inference.py` images:
 ## 5. Deployment Execution Flow
 When the developer pushes to the main branch, the expected execution flow is:
 1. **Backend Deploy:** The developer runs `modal deploy modal_inference.py` locally to push the ASR, TTS, and MiniCPM evaluator endpoints to the cloud.
-2. **Frontend Sync:** The Hugging Face Space automatically rebuilds using the GitHub repository integration or direct Space upload.
+2. **Frontend Sync:** The developer deploys the vetted public Space payload with `scripts/deploy_space.sh` rather than pushing the whole repository to the Space remote.
 3. **Runtime:** When a user visits the Space, `app.py` boots up the Gradio UI. The inference-engine toggle routes read attempts through either Modal endpoints or local inference, depending on the selected mode and deployed assets.
 4. **Submission Verification:** Before claiming Off the Grid or Llama Champion, manually verify the submitted Space can complete a read attempt in local mode without calling Modal.
+
+### Space Upload Shortcut
+The Hugging Face Space is treated as a deployment target, while GitHub remains the source-of-truth repository. Deploy the Space with:
+
+```bash
+./scripts/deploy_space.sh
+```
+
+For non-interactive deploys:
+
+```bash
+COMMIT_MESSAGE="Describe this deploy" ./scripts/deploy_space.sh --yes
+```
+
+The script stages only public runtime files, docs, and minimal data in `/tmp/read-along-ai-space-upload`, then uses `hf upload` to publish them. It deliberately excludes local raw audio, processed audio, notebook outputs, model artifacts, caches, `.hackathon`, `.venv`, and `.git`.
