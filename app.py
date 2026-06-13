@@ -816,10 +816,12 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 #mic-capture {
   border: none !important;
   box-shadow: none !important;
+  margin: 0 !important;
 }
 
 #mic-capture .waveform,
 #mic-capture canvas,
+#mic-capture audio,
 #mic-capture button[aria-label*='Edit'],
 #mic-capture button[aria-label*='Trim'],
 #mic-capture button[aria-label*='Download'] {
@@ -841,6 +843,22 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 #mic-capture label span {
   font-size: clamp(1.5rem, 4vw, 2.4rem) !important;
   font-weight: 900 !important;
+}
+
+#speech-output,
+#word-help-output,
+#tts-ready-audio,
+#success-trigger {
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+#feedback-display {
+  margin: 0 !important;
 }
 
 .feedback-card {

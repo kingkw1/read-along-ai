@@ -202,6 +202,14 @@ def test_tts_outputs_are_hidden_but_mounted_for_autoplay() -> None:
     assert word_help_output.autoplay is True
 
 
+def test_hidden_audio_outputs_do_not_reserve_layout_space() -> None:
+    assert "#speech-output" in app.CUSTOM_CSS
+    assert "#word-help-output" in app.CUSTOM_CSS
+    assert "#tts-ready-audio" in app.CUSTOM_CSS
+    assert "height: 0 !important" in app.CUSTOM_CSS
+    assert "min-height: 0 !important" in app.CUSTOM_CSS
+
+
 def test_app_defaults_to_turbo_mode() -> None:
     demo = app.build_app()
     engine_radios = [
