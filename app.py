@@ -10,6 +10,7 @@ import html
 import inspect
 import re
 import tempfile
+import threading
 import wave
 from pathlib import Path
 from typing import Optional
@@ -25,6 +26,8 @@ LOCAL_ENGINE = "🏕️ Off the Grid Mode (Local)"
 INFERENCE_ENGINES = [TURBO_ENGINE, LOCAL_ENGINE]
 
 CURRICULUM = ["The cat sat.", "The dog ran fast.", "She had a red hat.", "I love to play outside."]
+TTS_MEMORY_CACHE: dict[str, bytes] = {}
+TTS_CACHE_LOCK = threading.Lock()
 
 SAMPLE_RATE = 16_000
 DUMMY_AUDIO_SECONDS = 1
@@ -88,21 +91,69 @@ def transcribe_audio(audio_filepath: str, inference_engine: str = TURBO_ENGINE) 
 def synthesize_speech(target_text: str, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
     """Return a local WAV path for generated speech."""
     try:
-        if inference_engine == LOCAL_ENGINE:
-            return local_synthesize_speech(target_text)
-
-        audio_bytes = run_voxcpm_tts(target_text)
-        safe_label = "".join(ch for ch in target_text.lower() if ch.isalnum() or ch in ("-", "_"))[:24] or "speech"
-        output_path = Path(tempfile.gettempdir()) / f"read_along_{safe_label}.wav"
-        output_path.write_bytes(audio_bytes)
-        return str(output_path)
+        audio_bytes = synthesize_speech_bytes(target_text, inference_engine)
+        return write_tts_audio_file(target_text, audio_bytes)
     except Exception:
         return None
+
+
+def safe_tts_label(text: str) -> str:
+    return "".join(ch for ch in text.lower() if ch.isalnum() or ch in ("-", "_"))[:24] or "speech"
+
+
+def write_tts_audio_file(label: str, audio_bytes: bytes) -> str:
+    output_path = Path(tempfile.gettempdir()) / f"read_along_{safe_tts_label(label)}.wav"
+    output_path.write_bytes(audio_bytes)
+    return str(output_path)
+
+
+def synthesize_speech_bytes(target_text: str, inference_engine: str = TURBO_ENGINE) -> bytes:
+    """Return generated speech as WAV bytes for in-memory caching."""
+    if inference_engine == LOCAL_ENGINE:
+        return Path(local_synthesize_speech(target_text)).read_bytes()
+    return run_voxcpm_tts(target_text)
 
 
 def normalize_text(text: str) -> str:
     """Normalize spoken/target text for tolerant reading evaluation."""
     return re.sub(r"\s+", " ", "".join(ch.lower() for ch in text if ch.isalnum() or ch.isspace())).strip()
+
+
+def clean_tts_word(word: str) -> str:
+    """Normalize a single TTS helper word for cache lookup."""
+    return normalize_text(word)
+
+
+def sentence_tts_words(sentence: str) -> list[str]:
+    """Return unique cleaned words in reading order for TTS prewarming."""
+    words: list[str] = []
+    seen: set[str] = set()
+    for raw_word in sentence.split():
+        word = clean_tts_word(raw_word)
+        if word and word not in seen:
+            words.append(word)
+            seen.add(word)
+    return words
+
+
+def prewarm_level_words(sentence: str, engine_mode: str) -> None:
+    """Generate per-word TTS audio in the background and keep it in memory."""
+    for word in sentence_tts_words(sentence):
+        with TTS_CACHE_LOCK:
+            if word in TTS_MEMORY_CACHE:
+                continue
+
+        try:
+            audio_bytes = synthesize_speech_bytes(word, engine_mode)
+        except Exception:
+            continue
+
+        with TTS_CACHE_LOCK:
+            TTS_MEMORY_CACHE.setdefault(word, audio_bytes)
+
+
+def start_prewarm_level_words(sentence: str, engine_mode: str) -> None:
+    threading.Thread(target=prewarm_level_words, args=(sentence, engine_mode), daemon=True).start()
 
 
 def ask_minicpm_judge(target_text: str, transcript: str, inference_engine: str = TURBO_ENGINE) -> bool:
@@ -127,8 +178,8 @@ def render_reading_canvas(sentence: str) -> str:
         spans.append(
             f'<span class="clickable-word" role="button" tabindex="0" '
             f'aria-label="Hear the word {escaped_word}" '
-            f'onclick="readAlongSendWord(\'{escaped_word}\')" '
-            f'onkeydown="if(event.key === \'Enter\' || event.key === \' \') readAlongSendWord(\'{escaped_word}\')">'
+            f'onclick="readAlongSpeakWord(\'{escaped_word}\')" '
+            f'onkeydown="if(event.key === \'Enter\' || event.key === \' \') {{ event.preventDefault(); readAlongSpeakWord(\'{escaped_word}\'); }}">'
             f"{escaped_display}</span>"
         )
 
@@ -198,38 +249,72 @@ def evaluate_reading(audio_filepath: str, current_index: int, inference_engine: 
 
     exact_match = normalize_text(transcript) == normalize_text(target_sentence)
     if exact_match or _call_with_engine(ask_minicpm_judge, target_sentence, transcript, inference_engine=inference_engine):
-        praise_audio = _call_with_engine(synthesize_speech, "Amazing reading!", inference_engine=inference_engine)
-        return success_feedback(), praise_audio
+        return success_feedback(), None
 
     return retry_feedback(), None
 
 
-def next_sentence(idx: int) -> tuple[int, str, None, str, None, None]:
+def prewarm_current_level(current_index: int, inference_engine: str = TURBO_ENGINE) -> None:
+    sentence = CURRICULUM[int(current_index) % len(CURRICULUM)]
+    start_prewarm_level_words(sentence, inference_engine)
+
+
+def next_sentence(idx: int, inference_engine: str = TURBO_ENGINE) -> tuple[int, str, None, str, None, None]:
     """Advance to the next curriculum sentence and clear transient outputs."""
     next_index = (int(idx) + 1) % len(CURRICULUM)
-    return next_index, render_reading_canvas(CURRICULUM[next_index]), None, hidden_feedback(), None, None
+    next_level_sentence = CURRICULUM[next_index]
+    return next_index, render_reading_canvas(next_level_sentence), None, hidden_feedback(), None, None
 
 
 def listen_to_sentence(current_index: int, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
     return synthesize_speech(CURRICULUM[int(current_index) % len(CURRICULUM)], inference_engine)
 
 
-def update_audio_help(clicked_word: str, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
+def update_audio_help(clicked_word: str, inference_engine: str = TURBO_ENGINE) -> Optional[bytes]:
     """Generate audio help for a clicked reading word.
 
     The reading canvas sends the cleaned word text through a hidden Gradio
     textbox/button bridge because the words are rendered as accessible HTML
-    controls. Returning the WAV filepath to the autoplay Audio component makes
-    the browser play the helper audio immediately.
+    controls. Returning cached WAV bytes to the autoplay Audio component lets
+    the browser play the helper audio without waiting for TTS generation.
     """
-    word = (clicked_word or "").strip()
+    word = clean_tts_word(clicked_word or "")
     if not word:
         return None
 
-    return _call_with_engine(synthesize_speech, word, inference_engine=inference_engine)
+    with TTS_CACHE_LOCK:
+        cached_audio = TTS_MEMORY_CACHE.get(word)
+    if cached_audio is not None:
+        return cached_audio
+
+    try:
+        audio_bytes = synthesize_speech_bytes(word, inference_engine)
+    except Exception:
+        return None
+
+    with TTS_CACHE_LOCK:
+        TTS_MEMORY_CACHE[word] = audio_bytes
+    return audio_bytes
 
 
-def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
+def word_click_loading_state(clicked_word: str) -> gr.update:
+    word = clean_tts_word(clicked_word or "")
+    if not word:
+        return gr.update(value="Word helper")
+
+    with TTS_CACHE_LOCK:
+        is_cached = word in TTS_MEMORY_CACHE
+    return gr.update(value=word if is_cached else "🪄...")
+
+
+def finish_word_click(clicked_word: str, inference_engine: str = TURBO_ENGINE) -> tuple[Optional[str], gr.update]:
+    word = clean_tts_word(clicked_word or "")
+    audio_bytes = update_audio_help(word, inference_engine)
+    audio_path = write_tts_audio_file(word, audio_bytes) if audio_bytes is not None else None
+    return audio_path, gr.update(value=word or "Word helper")
+
+
+def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE) -> Optional[bytes]:
     """Backward-compatible alias for word-level audio help."""
     return update_audio_help(word, inference_engine)
 
@@ -394,14 +479,16 @@ footer, .api-docs, .built-with, .show-api, .gradio-container > .footer {
 
 FRONTEND_JS = """
 <script>
-  window.readAlongSendWord = function(word) {
-    const target = document.querySelector('#word-click-target textarea');
-    if (target) {
-      target.value = word;
-      target.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    const button = document.querySelector('#word-click-submit button');
-    if (button) button.click();
+  window.readAlongSpeakWord = function(word) {
+    const text = (word || '').trim();
+    if (!text || !('speechSynthesis' in window)) return;
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.82;
+    utterance.pitch = 1.08;
+    window.speechSynthesis.speak(utterance);
   };
 
   window.addEventListener('load', () => {
@@ -428,7 +515,7 @@ FRONTEND_JS = """
 
 
 def build_app() -> gr.Blocks:
-    with gr.Blocks(css=CUSTOM_CSS, title="Read-Along AI", head=FRONTEND_JS) as demo:
+    with gr.Blocks(title="Read-Along AI") as demo:
         current_index = gr.State(0)
 
         gr.HTML('<h1 class="app-title">Read-Along AI</h1>')
@@ -450,15 +537,22 @@ def build_app() -> gr.Blocks:
                 )
 
             feedback_display = gr.HTML(hidden_feedback(), elem_id="feedback-display")
-            speech_output = gr.Audio(label="Read-Along voice", autoplay=True, visible=False)
-            word_help_output = gr.Audio(label="Word helper voice", autoplay=True, visible="hidden")
+            speech_output = gr.Audio(
+                label="Read-Along voice",
+                autoplay=True,
+                visible="hidden",
+                elem_id="speech-output",
+            )
+            word_help_output = gr.Audio(
+                label="Word helper voice",
+                autoplay=True,
+                visible="hidden",
+                elem_id="word-help-output",
+            )
 
             with gr.Row():
                 next_button = gr.Button("Next Level ➡️", elem_classes="control-button", elem_id="next-word-button", variant="secondary")
                 listen_button = gr.Button("🔊 Listen to Sentence", elem_classes="control-button", variant="primary")
-
-            word_click_target = gr.Textbox(visible="hidden", elem_id="word-click-target")
-            word_click_submit = gr.Button(visible="hidden", elem_id="word-click-submit")
 
         microphone.change(
             fn=loading_feedback,
@@ -473,7 +567,7 @@ def build_app() -> gr.Blocks:
 
         next_button.click(
             fn=next_sentence,
-            inputs=current_index,
+            inputs=[current_index, inference_engine],
             outputs=[current_index, reading_canvas, microphone, feedback_display, speech_output, word_help_output],
         )
 
@@ -482,16 +576,8 @@ def build_app() -> gr.Blocks:
             inputs=[current_index, inference_engine],
             outputs=speech_output,
         )
-
-        word_click_submit.click(
-            fn=update_audio_help,
-            inputs=[word_click_target, inference_engine],
-            outputs=word_help_output,
-            show_progress="hidden",
-        )
-
     return demo
 
 
 if __name__ == "__main__":
-    build_app().launch()
+    build_app().launch(css=CUSTOM_CSS, head=FRONTEND_JS)
