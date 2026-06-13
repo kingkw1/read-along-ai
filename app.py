@@ -22,6 +22,7 @@ import gradio as gr
 import modal
 
 from local_inference import local_ask_minicpm_judge, local_synthesize_speech, local_transcribe_audio
+from word_boundaries import sentence_tts_words, word_boundary_timestamps
 
 MODAL_APP_NAME = "read-along-ai-inference"
 TURBO_ENGINE = "⚡ Turbo Mode (Modal)"
@@ -145,18 +146,6 @@ def format_text_for_tts(text: str) -> str:
     return text
 
 
-def sentence_tts_words(sentence: str) -> list[str]:
-    """Return unique cleaned words in reading order for TTS prewarming."""
-    words: list[str] = []
-    seen: set[str] = set()
-    for raw_word in sentence.split():
-        word = clean_tts_word(raw_word)
-        if word and word not in seen:
-            words.append(word)
-            seen.add(word)
-    return words
-
-
 def wav_duration_seconds(audio_bytes: bytes) -> float:
     with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
         return wav_file.getnframes() / float(wav_file.getframerate())
@@ -171,9 +160,9 @@ def _write_wav_clip(params: wave._wave_params, frames: bytes) -> bytes:
 
 
 def slice_sentence_audio_by_words(sentence: str, audio_bytes: bytes) -> dict[str, bytes]:
-    """Approximate word clips by splitting sentence audio by word character weight."""
-    words = sentence_tts_words(sentence)
-    if not words:
+    """Split sentence audio into word clips, using silence gaps when available."""
+    stamps = word_boundary_timestamps(sentence, audio_bytes)
+    if not stamps:
         return {}
 
     with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
@@ -181,21 +170,13 @@ def slice_sentence_audio_by_words(sentence: str, audio_bytes: bytes) -> dict[str
         total_frames = wav_file.getnframes()
         all_frames = wav_file.readframes(total_frames)
 
-    if total_frames <= 0:
-        return {}
-
     bytes_per_frame = params.nchannels * params.sampwidth
-    weights = [max(len(word), 1) for word in words]
-    total_weight = sum(weights)
     padding_frames = int(params.framerate * WORD_CLIP_PADDING_SECONDS)
 
     clips: dict[str, bytes] = {}
-    elapsed_weight = 0
-    for word, weight in zip(words, weights):
-        start_frame = int(total_frames * elapsed_weight / total_weight)
-        elapsed_weight += weight
-        end_frame = int(total_frames * elapsed_weight / total_weight)
-
+    for word, start_seconds, end_seconds in stamps:
+        start_frame = int(start_seconds * params.framerate)
+        end_frame = int(end_seconds * params.framerate)
         padded_start = max(0, start_frame - padding_frames)
         padded_end = min(total_frames, end_frame + padding_frames)
         if padded_end <= padded_start:

@@ -1,4 +1,7 @@
-gradio
+# Runtime target: Python 3.12. The pinned MiniCPM/Transformers stack pulls
+# tokenizers 0.19.x, whose PyO3 build does not support Python 3.14.
+# Keep .python-version and runtime.txt in sync with this environment.
+gradio==5.50.0
 modal
 faster-whisper
 pandas
@@ -9,9 +12,14 @@ nbclient
 torch
 transformers==4.40.2
 accelerate==0.29.3
+huggingface_hub>=0.23.0,<1.0
 peft==0.10.0
 trl==0.8.6
 bitsandbytes
 datasets
 rich
 sentencepiece
+soundfile
+voxcpm
+# Optional for LOCAL_ENGINE MiniCPM GGUF evaluation; install separately when a local GGUF is available.
+# llama-cpp-python

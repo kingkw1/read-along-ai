@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import io
+import os
 import wave
 
 import modal
+import pytest
 
 
 MODAL_APP_NAME = "read-along-ai-inference"
 SAMPLE_RATE = 16_000
 DUMMY_AUDIO_SECONDS = 1
+
+pytestmark = pytest.mark.skipif(
+    not (os.environ.get("MODAL_TOKEN_ID") and os.environ.get("MODAL_TOKEN_SECRET")),
+    reason="Modal endpoint contract tests require MODAL_TOKEN_ID and MODAL_TOKEN_SECRET",
+)
 
 
 def _modal_function(function_name: str):
