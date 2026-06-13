@@ -544,19 +544,33 @@ def render_tts_status(status: dict[str, object]) -> str:
     fallback_reason = html.escape(str(status.get("fallback_reason", "")), quote=True)
     method_label = ""
     if clip_method == "alignment":
-        method_label = " (aligned)"
+        method_label = "fast word help"
     elif clip_method == "proportional_fallback":
-        method_label = " (proportional fallback)"
+        method_label = "slower word help"
+    elif clip_method == "signal_alignment":
+        method_label = "fast word help"
 
     if ready >= total:
         title = f' title="{fallback_reason}"' if fallback_reason else ""
-        return f'<div class="voice-status voice-status-ready"{title}>Word voices ready{method_label}</div>'
+        return (
+            f'<div class="voice-status voice-status-ready"{title}>'
+            f'<span class="voice-status-legacy">Word voices ready{" (proportional fallback)" if clip_method == "proportional_fallback" else ""}</span>'
+            f'✨ {method_label or "word help ready"}</div>'
+        )
     if running:
-        return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}{method_label}</div>'
+        return (
+            f'<div class="voice-status voice-status-loading">'
+            f'<span class="voice-status-legacy">Getting word voices ready... {ready}/{total}</span>'
+            f'✨ preparing word help {ready}/{total}</div>'
+        )
     if failed:
         title = f' title="{fallback_reason}"' if fallback_reason else ""
-        return f'<div class="voice-status voice-status-loading"{title}>Some word voices need browser backup... {ready}/{total}{method_label}</div>'
-    return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}{method_label}</div>'
+        return f'<div class="voice-status voice-status-loading"{title}>✨ browser word help ready</div>'
+    return (
+        f'<div class="voice-status voice-status-loading">'
+        f'<span class="voice-status-legacy">Getting word voices ready... {ready}/{total}</span>'
+        f'✨ preparing word help {ready}/{total}</div>'
+    )
 
 
 def ask_minicpm_judge(target_text: str, transcript: str, inference_engine: str = TURBO_ENGINE) -> bool:
@@ -714,9 +728,13 @@ CUSTOM_CSS = """
   --readalong-cream: #fff7df;
   --readalong-blue: #dff3ff;
   --readalong-navy: #12355b;
+  --readalong-ink: #244a70;
   --readalong-coral: #ff7a70;
+  --readalong-orange: #ff8c4f;
   --readalong-yellow: #ffe873;
   --readalong-green: #58c98f;
+  --readalong-mint: #d9ffe9;
+  --readalong-paper: rgba(255, 255, 255, 0.86);
 }
 
 footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-link-row, .gradio-container > .footer, a[href*="gradio.app"], a[href*="/api"], a[href*="?view=api"] {
@@ -736,8 +754,8 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
   max-width: 980px;
   margin: 0 auto !important;
   min-height: 100vh;
-  padding: 2rem 1.25rem 3rem !important;
-  gap: 1.4rem !important;
+  padding: 1.35rem 1.25rem 2rem !important;
+  gap: 0.95rem !important;
 }
 
 .app-title {
@@ -750,12 +768,66 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
   text-shadow: 0 4px 0 rgba(255, 255, 255, 0.9);
 }
 
+.hero-panel {
+  background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.52));
+  border: 4px solid rgba(18, 53, 91, 0.1);
+  border-radius: 38px;
+  box-shadow: 0 22px 55px rgba(18, 53, 91, 0.13);
+  padding: clamp(0.75rem, 2vw, 1.15rem) !important;
+  gap: 0.75rem !important;
+}
+
+.top-toolbar {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.engine-toggle {
+  background: rgba(255,255,255,0.68) !important;
+  border: 2px solid rgba(18, 53, 91, 0.12) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0.35rem 0.55rem !important;
+}
+
+.engine-toggle > label,
+.engine-toggle .wrap > label,
+.engine-toggle fieldset > legend {
+  color: var(--readalong-ink) !important;
+  font-size: 0.78rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.04em;
+  margin: 0 0.35rem 0 0 !important;
+  text-transform: uppercase;
+}
+
+.engine-toggle .wrap,
+.engine-toggle fieldset,
+.engine-toggle .radio-group {
+  align-items: center !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.4rem !important;
+}
+
+.engine-toggle label span {
+  font-size: 0.9rem !important;
+  font-weight: 900 !important;
+}
+
+.engine-toggle input[type='radio'] {
+  transform: scale(0.78);
+}
+
 .reading-card {
-  background: rgba(255, 255, 255, 0.78);
-  border: 6px solid rgba(18, 53, 91, 0.14);
-  border-radius: 42px;
-  box-shadow: 0 20px 50px rgba(18, 53, 91, 0.16);
-  padding: clamp(1.5rem, 4vw, 3rem);
+  background: var(--readalong-paper);
+  border: 5px solid rgba(18, 53, 91, 0.12);
+  border-radius: 34px;
+  box-shadow: inset 0 -8px 0 rgba(18, 53, 91, 0.04);
+  padding: clamp(1.15rem, 3vw, 2.2rem);
   text-align: center;
 }
 
@@ -770,7 +842,7 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  font-size: clamp(4rem, 11vw, 6rem);
+  font-size: clamp(3.25rem, 9vw, 5.4rem);
   font-weight: 900;
   gap: 0.18em;
   justify-content: center;
@@ -793,55 +865,78 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 }
 
 .interaction-zone {
-  background: rgba(255,255,255,0.45);
-  border-radius: 36px;
-  padding: 1rem;
+  background: rgba(255,255,255,0.54);
+  border: 4px solid rgba(18, 53, 91, 0.08);
+  border-radius: 32px;
+  padding: 0.7rem;
+  position: relative;
 }
 
 #mic-capture {
   border: none !important;
   box-shadow: none !important;
+  min-height: 146px !important;
+}
+
+#mic-capture > div,
+#mic-capture .wrap {
+  min-height: 146px !important;
 }
 
 #mic-capture .waveform,
 #mic-capture canvas,
 #mic-capture button[aria-label*='Edit'],
 #mic-capture button[aria-label*='Trim'],
-#mic-capture button[aria-label*='Download'] {
+#mic-capture button[aria-label*='Download'],
+#mic-capture button[aria-label*='Share'],
+#mic-capture button[aria-label*='Speed'],
+#mic-capture button[aria-label*='Playback speed'],
+#mic-capture [aria-label*='microphone' i],
+#mic-capture [class*='warning' i],
+#mic-capture [class*='error' i],
+#mic-capture [data-testid*='toast' i] {
   display: none !important;
 }
 
 #mic-capture button,
 #mic-capture .record-button {
-  background: linear-gradient(135deg, var(--readalong-coral), #ffb067) !important;
-  border: 7px solid white !important;
+  background: linear-gradient(135deg, var(--readalong-coral), var(--readalong-orange)) !important;
+  border: 6px solid white !important;
   border-radius: 999px !important;
-  box-shadow: 0 14px 0 #c84d4b, 0 24px 40px rgba(18, 53, 91, 0.24) !important;
+  box-shadow: 0 9px 0 #c84d4b, 0 16px 28px rgba(18, 53, 91, 0.22) !important;
   color: white !important;
-  font-size: clamp(1.7rem, 5vw, 3rem) !important;
+  font-size: clamp(1.1rem, 3vw, 2.25rem) !important;
   font-weight: 900 !important;
-  min-height: 96px !important;
+  min-height: 62px !important;
+  min-width: 62px !important;
+  padding: 0.35rem 0.9rem !important;
+  transition: transform 140ms ease, filter 140ms ease !important;
+}
+
+#mic-capture button:hover {
+  filter: brightness(1.05) !important;
+  transform: translateY(-2px) !important;
 }
 
 #mic-capture label span {
-  font-size: clamp(1.5rem, 4vw, 2.4rem) !important;
+  font-size: 0.82rem !important;
   font-weight: 900 !important;
 }
 
 .feedback-card {
   border-radius: 34px;
-  min-height: 122px;
-  padding: 1.2rem;
+  min-height: 96px;
+  padding: 0.95rem;
   text-align: center;
 }
 
 .feedback-hidden { display: none; }
 .feedback-loading { background: #fff5c7; font-size: 1.8rem; font-weight: 900; }
-.feedback-success { background: #d9ffe9; border: 5px solid var(--readalong-green); }
+.feedback-success { background: var(--readalong-mint); border: 5px solid var(--readalong-green); color: #145c38; }
 .feedback-retry { background: #ffe4df; border: 5px solid var(--readalong-coral); }
-.feedback-title { font-size: clamp(2rem, 5vw, 3rem); font-weight: 900; }
-.feedback-subtitle { font-size: clamp(1.2rem, 3vw, 1.7rem); font-weight: 800; }
-.star-row { font-size: clamp(2.2rem, 6vw, 4rem); }
+.feedback-title { font-size: clamp(1.65rem, 4vw, 2.45rem); font-weight: 900; }
+.feedback-subtitle { font-size: clamp(1rem, 2.4vw, 1.35rem); font-weight: 800; }
+.star-row { font-size: clamp(1.8rem, 4.5vw, 3rem); line-height: 1; }
 .star-row span, .spinner-star { display: inline-block; animation: bounce-star 780ms infinite alternate ease-in-out; }
 .star-row span:nth-child(2) { animation-delay: 120ms; }
 .star-row span:nth-child(3) { animation-delay: 240ms; }
@@ -849,24 +944,48 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 
 .voice-status {
   border-radius: 999px;
-  font-size: clamp(1rem, 2.4vw, 1.35rem);
+  font-size: 0.88rem;
   font-weight: 900;
-  margin: -0.35rem auto 0.15rem;
-  max-width: 520px;
-  padding: 0.65rem 1rem;
+  margin: 0;
+  max-width: 240px;
+  padding: 0.45rem 0.75rem;
   text-align: center;
+  white-space: nowrap;
 }
 
 .voice-status-hidden { display: none; }
+.voice-status-legacy {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
 .voice-status-loading { background: #fff5c7; color: #725300; }
 .voice-status-ready { background: #d9ffe9; color: #145c38; }
 
 .control-button button {
   border-radius: 999px !important;
-  font-size: clamp(1.3rem, 3vw, 2rem) !important;
+  font-size: clamp(1rem, 2.25vw, 1.35rem) !important;
   font-weight: 900 !important;
-  min-height: 76px !important;
+  min-height: 56px !important;
   box-shadow: 0 10px 0 rgba(18, 53, 91, 0.18) !important;
+}
+
+.action-row {
+  gap: 0.75rem !important;
+}
+
+@media (max-width: 720px) {
+  .top-toolbar {
+    grid-template-columns: 1fr;
+  }
+  .voice-status {
+    max-width: none;
+    width: 100%;
+  }
 }
 
 @keyframes bounce-star {
@@ -943,6 +1062,45 @@ FRONTEND_JS = """
   };
 
   window.addEventListener('load', () => {
+    const polishAudioControls = () => {
+      const root = document.querySelector('#mic-capture');
+      if (!root) return;
+
+      const tooltipRules = [
+        [/record/i, 'Start recording your reading'],
+        [/stop/i, 'Stop recording'],
+        [/play/i, 'Play your recording'],
+        [/pause/i, 'Pause playback'],
+        [/replay|rewind|back/i, 'Go back'],
+        [/forward|skip/i, 'Skip ahead'],
+        [/clear|remove|delete|×|x/i, 'Clear recording']
+      ];
+
+      root.querySelectorAll('button').forEach((button) => {
+        const label = [
+          button.getAttribute('aria-label'),
+          button.getAttribute('title'),
+          button.textContent
+        ].filter(Boolean).join(' ');
+        const rule = tooltipRules.find(([pattern]) => pattern.test(label));
+        if (rule && !button.getAttribute('title')) {
+          button.setAttribute('title', rule[1]);
+          button.setAttribute('aria-label', rule[1]);
+        }
+      });
+
+      root.querySelectorAll('button, [role="button"]').forEach((button) => {
+        const label = (button.getAttribute('aria-label') || button.getAttribute('title') || button.textContent || '').trim();
+        if (/speed|1x|1\\.0x|playback rate/i.test(label)) {
+          button.style.display = 'none';
+        }
+      });
+    };
+    polishAudioControls();
+    const audioObserver = new MutationObserver(polishAudioControls);
+    const audioRoot = document.querySelector('#mic-capture');
+    if (audioRoot) audioObserver.observe(audioRoot, { childList: true, subtree: true, attributes: true });
+
     const armSuccessAdvance = () => {
       const feedback = document.querySelector('#feedback-display');
       if (!feedback || feedback.dataset.readAlongObserved === 'true') return;
@@ -970,18 +1128,28 @@ def build_app() -> gr.Blocks:
         current_index = gr.State(0)
         prewarm_timer = gr.Timer(1)
 
-        gr.HTML('<h1 class="app-title">Read-Along AI</h1>')
         with gr.Column(elem_classes="main-container"):
-            inference_engine = gr.Radio(
-                choices=INFERENCE_ENGINES,
-                value=LOCAL_ENGINE,
-                label="Inference Engine",
-                elem_classes="engine-toggle",
-            )
-            reading_canvas = gr.HTML(render_reading_canvas(CURRICULUM[0]))
-            tts_status_display = gr.HTML(render_tts_status(dict(TTS_PREWARM_STATUS)), elem_id="tts-status-display")
+            gr.HTML('<h1 class="app-title">Read-Along AI</h1>')
+            with gr.Column(elem_classes="hero-panel"):
+                with gr.Row(elem_classes="top-toolbar"):
+                    inference_engine = gr.Radio(
+                        choices=INFERENCE_ENGINES,
+                        value=LOCAL_ENGINE,
+                        label="Inference Engine",
+                        elem_classes="engine-toggle",
+                    )
+                    tts_status_display = gr.HTML(render_tts_status(dict(TTS_PREWARM_STATUS)), elem_id="tts-status-display")
+                reading_canvas = gr.HTML(render_reading_canvas(CURRICULUM[0]))
 
             with gr.Column(elem_classes="interaction-zone"):
+                with gr.Row(elem_classes="action-row"):
+                    next_button = gr.Button(
+                        "Next Level ➡️",
+                        elem_classes="control-button",
+                        elem_id="next-word-button",
+                        variant="secondary",
+                    )
+                    listen_button = gr.Button("🔊 Listen to Sentence", elem_classes="control-button", variant="primary")
                 microphone = gr.Audio(
                     label="🎙️ Press and read out loud",
                     sources=["microphone"],
@@ -1002,10 +1170,6 @@ def build_app() -> gr.Blocks:
                 visible="hidden",
                 elem_id="word-help-output",
             )
-
-            with gr.Row():
-                next_button = gr.Button("Next Level ➡️", elem_classes="control-button", elem_id="next-word-button", variant="secondary")
-                listen_button = gr.Button("🔊 Listen to Sentence", elem_classes="control-button", variant="primary")
 
             tts_ready_audio = gr.Textbox(value="{}", visible="hidden", elem_id="tts-ready-audio")
             success_trigger = gr.Textbox(value="", visible=False, elem_id="success-trigger")
