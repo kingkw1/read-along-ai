@@ -11,6 +11,7 @@ import html
 import io
 import inspect
 import json
+import logging
 import re
 import tempfile
 import threading
@@ -22,6 +23,10 @@ import gradio as gr
 import modal
 
 from local_inference import _load_whisper_model, local_ask_minicpm_judge, local_synthesize_speech, local_transcribe_audio
+
+LOGGER = logging.getLogger(__name__)
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 MODAL_APP_NAME = "read-along-ai-inference"
 TURBO_ENGINE = "⚡ Turbo Mode (Modal)"
@@ -37,6 +42,8 @@ TTS_PREWARM_STATUS: dict[str, object] = {
     "failed": 0,
     "running": False,
     "ready_words": [],
+    "clip_method": "",
+    "fallback_reason": "",
 }
 TTS_CACHE_LOCK = threading.Lock()
 
@@ -202,6 +209,7 @@ def align_sentence_audio_words(sentence: str, audio_bytes: bytes) -> dict[str, t
     if not target_words:
         return {}
 
+    LOGGER.info("Starting word alignment for %d target words", len(target_words))
     audio_path = write_tts_audio_file("alignment_sentence", audio_bytes)
     model = _load_whisper_model()
     segments, _info = model.transcribe(
@@ -241,6 +249,7 @@ def align_sentence_audio_words(sentence: str, audio_bytes: bytes) -> dict[str, t
             raise ValueError(f"unusable aligned timestamp for {target_word!r}: {start}-{end}")
         timestamps.setdefault(target_word, (start, min(end, audio_duration)))
 
+    LOGGER.info("Word alignment succeeded for %d/%d target words", len(timestamps), len(target_words))
     return timestamps
 
 
@@ -260,12 +269,21 @@ def slice_sentence_audio_by_timestamps(
     return clips
 
 
-def slice_sentence_audio_with_alignment_or_fallback(sentence: str, audio_bytes: bytes) -> dict[str, bytes]:
+def slice_sentence_audio_with_alignment_or_fallback(
+    sentence: str, audio_bytes: bytes, method_report: Optional[dict[str, str]] = None
+) -> dict[str, bytes]:
     """Prefer local word alignment for clips, falling back to proportional slicing on failure."""
     try:
         timestamps = align_sentence_audio_words(sentence, audio_bytes)
-        return slice_sentence_audio_by_timestamps(sentence, audio_bytes, timestamps)
-    except Exception:
+        clips = slice_sentence_audio_by_timestamps(sentence, audio_bytes, timestamps)
+        if method_report is not None:
+            method_report.update({"method": "alignment", "fallback_reason": ""})
+        LOGGER.info("Using aligned word clips for sentence %r", sentence)
+        return clips
+    except Exception as exc:
+        if method_report is not None:
+            method_report.update({"method": "proportional_fallback", "fallback_reason": str(exc)})
+        LOGGER.warning("Using proportional word-clip fallback for sentence %r: %s", sentence, exc)
         return slice_sentence_audio_by_words(sentence, audio_bytes)
 
 
@@ -318,6 +336,8 @@ def _initialize_prewarm_status(sentence: str, words: list[str]) -> None:
                 "failed": 0,
                 "running": len(ready_words) < len(words),
                 "ready_words": ready_words,
+                "clip_method": "cache" if ready_words else "",
+                "fallback_reason": "",
             }
         )
 
@@ -337,12 +357,19 @@ def prewarm_level_words(sentence: str, engine_mode: str) -> None:
 
     try:
         sentence_audio = synthesize_speech_bytes(sentence, engine_mode)
-        word_clips = slice_sentence_audio_with_alignment_or_fallback(sentence, sentence_audio)
-    except Exception:
+        method_report: dict[str, str] = {}
+        word_clips = slice_sentence_audio_with_alignment_or_fallback(sentence, sentence_audio, method_report)
+        with TTS_CACHE_LOCK:
+            if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                TTS_PREWARM_STATUS["clip_method"] = method_report.get("method", "")
+                TTS_PREWARM_STATUS["fallback_reason"] = method_report.get("fallback_reason", "")
+    except Exception as exc:
+        LOGGER.exception("Word voice prewarm failed for sentence %r", sentence)
         with TTS_CACHE_LOCK:
             if TTS_PREWARM_STATUS.get("sentence") == sentence:
                 TTS_PREWARM_STATUS["failed"] = int(TTS_PREWARM_STATUS.get("failed", 0)) + len(missing_words)
                 TTS_PREWARM_STATUS["running"] = False
+                TTS_PREWARM_STATUS["fallback_reason"] = str(exc)
         return
 
     for word in missing_words:
@@ -398,13 +425,23 @@ def render_tts_status(status: dict[str, object]) -> str:
     ready = int(status.get("ready", 0))
     failed = int(status.get("failed", 0))
     running = bool(status.get("running", False))
+    clip_method = str(status.get("clip_method", ""))
+    fallback_reason = html.escape(str(status.get("fallback_reason", "")), quote=True)
+    method_label = ""
+    if clip_method == "alignment":
+        method_label = " (aligned)"
+    elif clip_method == "proportional_fallback":
+        method_label = " (proportional fallback)"
+
     if ready >= total:
-        return '<div class="voice-status voice-status-ready">Word voices ready</div>'
+        title = f' title="{fallback_reason}"' if fallback_reason else ""
+        return f'<div class="voice-status voice-status-ready"{title}>Word voices ready{method_label}</div>'
     if running:
-        return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}</div>'
+        return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}{method_label}</div>'
     if failed:
-        return f'<div class="voice-status voice-status-loading">Some word voices need browser backup... {ready}/{total}</div>'
-    return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}</div>'
+        title = f' title="{fallback_reason}"' if fallback_reason else ""
+        return f'<div class="voice-status voice-status-loading"{title}>Some word voices need browser backup... {ready}/{total}{method_label}</div>'
+    return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}{method_label}</div>'
 
 
 def ask_minicpm_judge(target_text: str, transcript: str, inference_engine: str = TURBO_ENGINE) -> bool:

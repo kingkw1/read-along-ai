@@ -22,6 +22,8 @@ def clear_tts_memory_cache() -> None:
             "failed": 0,
             "running": False,
             "ready_words": [],
+            "clip_method": "",
+            "fallback_reason": "",
         }
     )
 
@@ -193,9 +195,10 @@ def test_slice_sentence_audio_by_timestamps_returns_valid_wav_clips() -> None:
     assert all(audio_bytes.startswith(b"RIFF") for audio_bytes in clips.values())
 
 
-def test_alignment_slicer_falls_back_to_proportional_when_alignment_fails(monkeypatch) -> None:
+def test_alignment_slicer_falls_back_to_proportional_when_alignment_fails(monkeypatch, caplog) -> None:
     audio_bytes = silent_wav_bytes(seconds=1.2)
     fallback_clips = {"the": b"fallback-the"}
+    method_report: dict[str, str] = {}
 
     monkeypatch.setattr(
         app,
@@ -204,7 +207,12 @@ def test_alignment_slicer_falls_back_to_proportional_when_alignment_fails(monkey
     )
     monkeypatch.setattr(app, "slice_sentence_audio_by_words", lambda _sentence, _audio_bytes: fallback_clips)
 
-    assert app.slice_sentence_audio_with_alignment_or_fallback("The cat sat.", audio_bytes) == fallback_clips
+    with caplog.at_level("WARNING", logger=app.LOGGER.name):
+        clips = app.slice_sentence_audio_with_alignment_or_fallback("The cat sat.", audio_bytes, method_report)
+
+    assert clips == fallback_clips
+    assert method_report == {"method": "proportional_fallback", "fallback_reason": "alignment failed"}
+    assert "Using proportional word-clip fallback" in caplog.text
 
 
 def test_slice_sentence_audio_by_timestamps_rejects_missing_partial_timestamps() -> None:
@@ -239,6 +247,29 @@ def test_prewarm_level_words_generates_sentence_once_and_caches_word_clips(monke
     assert app.TTS_PREWARM_STATUS["ready"] == 3
     assert app.TTS_PREWARM_STATUS["failed"] == 0
     assert app.TTS_PREWARM_STATUS["running"] is False
+    assert app.TTS_PREWARM_STATUS["clip_method"] == "alignment"
+    assert app.TTS_PREWARM_STATUS["fallback_reason"] == ""
+
+
+def test_current_tts_status_reports_proportional_fallback_method() -> None:
+    app.TTS_PREWARM_STATUS.update(
+        {
+            "sentence": "The cat sat.",
+            "total": 3,
+            "ready": 3,
+            "failed": 0,
+            "running": False,
+            "ready_words": ["the", "cat", "sat"],
+            "clip_method": "proportional_fallback",
+            "fallback_reason": "alignment failed",
+        }
+    )
+
+    status_html = app.render_tts_status(app.TTS_PREWARM_STATUS)
+
+    assert "Word voices ready" in status_html
+    assert "proportional fallback" in status_html
+    assert 'title="alignment failed"' in status_html
 
 
 def test_update_audio_help_returns_cached_bytes_without_generating(monkeypatch) -> None:
