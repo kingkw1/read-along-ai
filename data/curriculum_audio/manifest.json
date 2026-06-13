@@ -1,8 +1,49 @@
 [
   {
     "index": 0,
+    "variant": "natural",
     "sentence": "The cat sat.",
-    "wav": "data/curriculum_audio/01_thecatsat.wav",
+    "tts_text": "The cat sat.",
+    "wav": "data/curriculum_audio/natural/01_thecatsat.wav",
+    "words": [
+      "the",
+      "cat",
+      "sat"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 0,
+    "variant": "comma",
+    "sentence": "The cat sat.",
+    "tts_text": "The, cat, sat.",
+    "wav": "data/curriculum_audio/comma/01_thecatsat.wav",
+    "words": [
+      "the",
+      "cat",
+      "sat"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 0,
+    "variant": "period",
+    "sentence": "The cat sat.",
+    "tts_text": "The. cat. sat.",
+    "wav": "data/curriculum_audio/period/01_thecatsat.wav",
+    "words": [
+      "the",
+      "cat",
+      "sat"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 0,
+    "variant": "spaced_comma",
+    "sentence": "The cat sat.",
+    "tts_text": "The , cat , sat.",
+    "wav": "data/curriculum_audio/spaced_comma/01_thecatsat.wav",
     "words": [
       "the",
       "cat",
@@ -12,8 +53,52 @@
   },
   {
     "index": 1,
+    "variant": "natural",
     "sentence": "The dog ran fast.",
-    "wav": "data/curriculum_audio/02_thedogranfast.wav",
+    "tts_text": "The dog ran fast.",
+    "wav": "data/curriculum_audio/natural/02_thedogranfast.wav",
+    "words": [
+      "the",
+      "dog",
+      "ran",
+      "fast"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 1,
+    "variant": "comma",
+    "sentence": "The dog ran fast.",
+    "tts_text": "The, dog, ran, fast.",
+    "wav": "data/curriculum_audio/comma/02_thedogranfast.wav",
+    "words": [
+      "the",
+      "dog",
+      "ran",
+      "fast"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 1,
+    "variant": "period",
+    "sentence": "The dog ran fast.",
+    "tts_text": "The. dog. ran. fast.",
+    "wav": "data/curriculum_audio/period/02_thedogranfast.wav",
+    "words": [
+      "the",
+      "dog",
+      "ran",
+      "fast"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 1,
+    "variant": "spaced_comma",
+    "sentence": "The dog ran fast.",
+    "tts_text": "The , dog , ran , fast.",
+    "wav": "data/curriculum_audio/spaced_comma/02_thedogranfast.wav",
     "words": [
       "the",
       "dog",
@@ -24,8 +109,55 @@
   },
   {
     "index": 2,
+    "variant": "natural",
     "sentence": "She had a red hat.",
-    "wav": "data/curriculum_audio/03_shehadaredhat.wav",
+    "tts_text": "She had a red hat.",
+    "wav": "data/curriculum_audio/natural/03_shehadaredhat.wav",
+    "words": [
+      "she",
+      "had",
+      "a",
+      "red",
+      "hat"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 2,
+    "variant": "comma",
+    "sentence": "She had a red hat.",
+    "tts_text": "She, had, a, red, hat.",
+    "wav": "data/curriculum_audio/comma/03_shehadaredhat.wav",
+    "words": [
+      "she",
+      "had",
+      "a",
+      "red",
+      "hat"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 2,
+    "variant": "period",
+    "sentence": "She had a red hat.",
+    "tts_text": "She. had. a. red. hat.",
+    "wav": "data/curriculum_audio/period/03_shehadaredhat.wav",
+    "words": [
+      "she",
+      "had",
+      "a",
+      "red",
+      "hat"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 2,
+    "variant": "spaced_comma",
+    "sentence": "She had a red hat.",
+    "tts_text": "She , had , a , red , hat.",
+    "wav": "data/curriculum_audio/spaced_comma/03_shehadaredhat.wav",
     "words": [
       "she",
       "had",
@@ -37,8 +169,55 @@
   },
   {
     "index": 3,
+    "variant": "natural",
     "sentence": "I love to play outside.",
-    "wav": "data/curriculum_audio/04_ilovetoplayoutside.wav",
+    "tts_text": "I love to play outside.",
+    "wav": "data/curriculum_audio/natural/04_ilovetoplayoutside.wav",
+    "words": [
+      "i",
+      "love",
+      "to",
+      "play",
+      "outside"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 3,
+    "variant": "comma",
+    "sentence": "I love to play outside.",
+    "tts_text": "I, love, to, play, outside.",
+    "wav": "data/curriculum_audio/comma/04_ilovetoplayoutside.wav",
+    "words": [
+      "i",
+      "love",
+      "to",
+      "play",
+      "outside"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 3,
+    "variant": "period",
+    "sentence": "I love to play outside.",
+    "tts_text": "I. love. to. play. outside.",
+    "wav": "data/curriculum_audio/period/04_ilovetoplayoutside.wav",
+    "words": [
+      "i",
+      "love",
+      "to",
+      "play",
+      "outside"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 3,
+    "variant": "spaced_comma",
+    "sentence": "I love to play outside.",
+    "tts_text": "I , love , to , play , outside.",
+    "wav": "data/curriculum_audio/spaced_comma/04_ilovetoplayoutside.wav",
     "words": [
       "i",
       "love",
