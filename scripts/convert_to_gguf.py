@@ -21,6 +21,16 @@ DEFAULT_MODEL_ID = "kingkw1/minicpm-phonetic-evaluator"
 DEFAULT_LLAMA_CPP_DIR = REPO_ROOT / "third_party" / "llama.cpp"
 DEFAULT_MODEL_DIR = REPO_ROOT / "models" / "hf" / "kingkw1" / "minicpm-phonetic-evaluator"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "models" / "gguf"
+CONDA_ENV_KEYS = {
+    "CONDA_DEFAULT_ENV",
+    "CONDA_EXE",
+    "CONDA_PREFIX",
+    "CONDA_PROMPT_MODIFIER",
+    "CONDA_PYTHON_EXE",
+    "CONDA_SHLVL",
+    "_CE_CONDA",
+    "_CE_M",
+}
 
 
 def run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
@@ -30,6 +40,24 @@ def run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None =
     else:
         print(f"\n$ {display}", flush=True)
     subprocess.run(cmd, cwd=cwd, env=env, check=True)
+
+
+def clean_python_subprocess_env(extra_pythonpath: list[Path] | None = None) -> dict[str, str]:
+    """Return an env that keeps the active venv but removes Conda/Python leakage."""
+    env = os.environ.copy()
+    for key in CONDA_ENV_KEYS:
+        env.pop(key, None)
+
+    # These can make a venv interpreter import/link against Conda packages.
+    env.pop("LD_LIBRARY_PATH", None)
+    env.pop("PYTHONHOME", None)
+    env.pop("PYTHONPATH", None)
+    env["PYTHONNOUSERSITE"] = "1"
+
+    if extra_pythonpath:
+        env["PYTHONPATH"] = os.pathsep.join(str(path) for path in extra_pythonpath)
+
+    return env
 
 
 def positive_int(value: str) -> int:
@@ -96,7 +124,10 @@ def ensure_llama_cpp(args: argparse.Namespace) -> Path:
         req_file = llama_dir / "requirements" / "requirements-convert_hf_to_gguf.txt"
         if not req_file.exists():
             raise SystemExit(f"Expected llama.cpp conversion requirements not found: {req_file}")
-        run([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
+        run(
+            [sys.executable, "-m", "pip", "install", "-r", str(req_file)],
+            env=clean_python_subprocess_env(),
+        )
 
     if args.build_llama_cpp:
         build_dir = llama_dir / "build"
@@ -169,13 +200,8 @@ def convert_to_fp_gguf(args: argparse.Namespace, llama_dir: Path, model_dir: Pat
         print(f"Using existing FP GGUF: {fp_gguf}", flush=True)
         return fp_gguf
 
-    env = os.environ.copy()
     gguf_py = llama_dir / "gguf-py"
-    env["PYTHONPATH"] = (
-        str(gguf_py)
-        if not env.get("PYTHONPATH")
-        else f"{gguf_py}{os.pathsep}{env['PYTHONPATH']}"
-    )
+    env = clean_python_subprocess_env([gguf_py])
 
     run(
         [
