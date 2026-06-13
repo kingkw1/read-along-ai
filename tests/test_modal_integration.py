@@ -3,14 +3,25 @@
 from __future__ import annotations
 
 import io
+import os
 import wave
 
 import modal
+import pytest
 
 
 MODAL_APP_NAME = "read-along-ai-inference"
 SAMPLE_RATE = 16_000
 DUMMY_AUDIO_SECONDS = 1
+
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        os.environ.get("RUN_MODAL_INTEGRATION") != "1",
+        reason="set RUN_MODAL_INTEGRATION=1 to call deployed Modal endpoints",
+    ),
+]
 
 
 def _modal_function(function_name: str):

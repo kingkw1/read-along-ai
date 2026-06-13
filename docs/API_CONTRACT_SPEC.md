@@ -15,7 +15,7 @@ The Gradio UI events should call wrapper functions in `app.py`, never Modal endp
     * **Input:** The string of text to be spoken.
     * **Output:** The local file path to the generated `.wav` file to be played by the Gradio UI.
 * `def ask_minicpm_judge(target_text: str, transcript: str) -> bool:`
-    * **Input:** The displayed target text and ASR transcript.
+    * **Input:** The displayed target sentence and ASR transcript.
     * **Output:** `True` when the transcript is an acceptable phonetic match, otherwise `False`.
 
 ## 3. Modal Endpoint Contracts (Phase 1 Backend)
@@ -35,10 +35,10 @@ Codex should write the Modal stub functions that the wrappers above will call. W
 ### Endpoint C: Phonetic Evaluator (Fine-Tuned MiniCPM)
 * **Modal Function Name:** `run_minicpm_evaluator`
 * **Model:** `kingkw1/minicpm-phonetic-evaluator`
-* **Payload In:** `target_word` or target text (str), `transcript` (str)
+* **Payload In:** target sentence or target text (str), `transcript` (str)
 * **Payload Out:** `str`
     * Schema: `"True"` or `"False"`
-* **Behavior:** The endpoint loads the fine-tuned MiniCPM model with `trust_remote_code=True`, formats the prompt using the same instruction/input/output structure used during training, and returns a binary verdict for whether the ASR transcript is a valid phonetic match.
+* **Behavior:** The endpoint loads the fine-tuned MiniCPM model with `trust_remote_code=True`, formats the prompt using the same instruction/input/output structure used during training, and returns a binary verdict for whether the ASR transcript is a valid phonetic match for the target sentence.
 
 ## 3.5 Local Endpoint Contracts (Off the Grid Backend)
 Codex should write equivalent functions in `local_inference.py` to mirror the inputs/outputs above.
@@ -51,9 +51,10 @@ Young users cannot parse stack traces.
 * If the Modal ASR endpoint times out or fails, the `transcribe_audio` wrapper must catch the exception and return a specific string: `"[ASR_ERROR]"`. The Gradio UI must handle this silently by asking the user to "Try pressing record again!"
 * If the TTS endpoint fails, `synthesize_speech` must return `None`, and the UI should gracefully fail open (no audio plays, but the UI does not freeze).
 * If the MiniCPM evaluator fails, the wrapper should fail closed and return `False` so incorrect readings are not accidentally marked as successful.
+* Word-click assistance should not block the UI. The current app pre-generates word clips from sentence TTS where possible and falls back to browser speech synthesis when cached audio is unavailable.
 
 ## 5. Testing Strategy
 As explicitly defined in Phase 1 (Verification Checkpoint 2), the backend API contract must be strictly isolated for testing:
-* Codex must generate a `test_backend.py` file.
-* This file must use `pytest` to invoke the `transcribe_audio` and `synthesize_speech` wrappers independently from the Gradio UI.
-* It should verify that passing a static `.wav` file to the ASR wrapper returns a valid transcription string, and that passing text to the TTS wrapper returns a valid bytes/path object.
+* Backend and app contract tests live under `tests/`.
+* Local unit tests should verify the Gradio-facing contracts without calling deployed services by default.
+* Modal endpoint checks should live as explicit integration tests and run only when the developer opts in, since they call deployed infrastructure.

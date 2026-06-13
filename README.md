@@ -26,7 +26,7 @@ tags:
 *Track: Backyard AI*
 
 ## 📖 The Vision
-Learning to read is a monumental milestone for young children, but it can be an intimidating process. **Read-Along AI** was built to solve a very specific problem: *[Insert personalization: e.g., Detail how you homeschool your children, and this tool was built specifically to solve the friction of your daily reading curriculum]* providing a patient, distraction-free, and interactive reading assistant that gives instant, gentle vocal feedback. 
+Learning to read is a monumental milestone for young children, but practice can be intimidating when feedback is inconsistent, delayed, or too harsh for developing speech. **Read-Along AI** was built to solve a very specific problem: *[Insert personalization: e.g., Detail how you homeschool your children, and this tool was built specifically to solve the friction of your daily reading curriculum]* providing a patient, distraction-free reading assistant that listens to a child read short sentences and gives instant, gentle feedback.
 
 **Field Testing Note:** *[Insert brief anecdote or reaction from the children actually using the app here to prove real-world usage for the Backyard AI track]*
 
@@ -41,13 +41,14 @@ For a deep dive into the architecture and development plan, please review our sp
 * [UI/UX & Frontend Specification](docs/UI_UX_SPEC.md)
 * [API & Backend Contract](docs/API_CONTRACT_SPEC.md)
 * [Deployment Strategy](docs/DEPLOYMENT_SPEC.md)
-* [9-Day Roadmap](docs/ROADMAP.md)
+* [Hackathon Roadmap](docs/ROADMAP.md)
 
 ### Components
 * **Frontend:** A custom, gamified Gradio interface ("Off-Brand" UI) built for legibility and young readers.
 * **ASR (Speech-to-Text):** **Cohere Transcribe** (2B parameters). Optimized for low-latency voice capture to process the child's reading attempts instantly.
-* **TTS (Text-to-Speech):** **OpenBMB VoxCPM** (*[Insert Parameter Count]*). This acts as the **central interactive component** of the app, driving the core feedback loop, stepping in during "Struggle States," and providing on-demand phonemic assistance.
-* **Compute / Inference:** Utilizes a **Dual-Mode Hybrid Architecture**. The app defaults to **Modal** serverless endpoints for zero-latency interactions but includes an "Off the Grid" toggle to run entirely on local Hugging Face Space resources.
+* **Reading Evaluator:** A fine-tuned **MiniCPM phonetic evaluator** (`kingkw1/minicpm-phonetic-evaluator`) judges close or ambiguous ASR transcripts after exact normalized matching.
+* **TTS (Text-to-Speech):** **OpenBMB VoxCPM** (*[Insert Parameter Count]*). This acts as the central interactive component for sentence read-back and on-demand word assistance.
+* **Compute / Inference:** Utilizes a **Dual-Mode Hybrid Architecture**. The app includes **Turbo Mode** for Modal serverless endpoints and **Off the Grid Mode** for local Hugging Face Space resources.
 
 ## 🏆 Hackathon Eligibility & Attributions
 
@@ -74,10 +75,14 @@ The high-speed inference endpoints powering the primary "Turbo Mode" are hosted 
 * 🏅 **Field Notes:** *[Insert Link to Blog Post / Medium Article]*
 
 ## 🚀 How It Works
-The app scales with the developmental stages of early readers:
-1. **Level 1 (Phonics):** Focuses on single letters and their phonetic sounds.
-2. **Level 2 (CVC Words):** Short Consonant-Vowel-Consonant words with fuzzy-matching for developing speech patterns.
-3. **Level 3 (Sentences):** Full sentence reading with interactive word-click pronunciation and a final TTS read-back.
+The hackathon MVP is focused on a stable sentence-reading loop:
+1. **Choose a sentence:** The app displays one short curriculum sentence in large, clickable text.
+2. **Get help when needed:** The child can tap a word to hear it, or press "Listen to Sentence" for a full VoxCPM read-back.
+3. **Read aloud:** The child records an attempt through the microphone.
+4. **Evaluate gently:** The app accepts exact normalized matches immediately, then asks the fine-tuned MiniCPM evaluator to judge close child-speech or ASR variants.
+5. **Celebrate or retry:** Correct readings trigger confetti and advance to the next sentence; rejected readings get a simple, encouraging retry prompt.
+
+Earlier phonics and CVC word levels were intentionally deferred. The current submission prioritizes reliability, privacy, and demo clarity around short-sentence reading practice.
 
 ## 📹 Submission Links
 * **Demo Video:** [Insert Video Link]

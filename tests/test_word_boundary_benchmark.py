@@ -9,7 +9,7 @@ import app
 import pytest
 
 
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[1]
 COMMA_AUDIO_DIR = REPO_ROOT / "data" / "curriculum_audio" / "comma"
 
 

@@ -1,8 +1,23 @@
+"""Manual smoke test for the local-only inference path.
+
+Run from the repository root after local model assets are available:
+    python scripts/manual/local_smoke.py
+"""
+
+from __future__ import annotations
+
+import sys
 import time
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
 from local_inference import (
-    local_transcribe_audio, 
-    local_ask_minicpm_judge, 
-    local_synthesize_speech
+    local_ask_minicpm_judge,
+    local_synthesize_speech,
+    local_transcribe_audio,
 )
 
 # Replace this with the path to one of your real audio files
@@ -22,7 +37,7 @@ print(f"Verdict for '{TEST_TARGET}' vs 'scientists': {verdict} (Took {time.time(
 
 print("--- 3. Testing VoxCPM (TTS) ---")
 start = time.time()
-audio_bytes = local_synthesize_speech("You did a great job!")
-print(f"Generated {len(audio_bytes)} bytes of audio. (Took {time.time() - start:.2f}s)\n")
+audio_path = local_synthesize_speech("You did a great job!")
+print(f"Generated audio at {audio_path!r}. (Took {time.time() - start:.2f}s)\n")
 
-print("✅ ALL LOCAL MODELS LOADED AND EXECUTED SUCCESSFULLY!")
+print("All local models loaded and executed successfully.")

@@ -15,7 +15,7 @@ Codex must inject the following CSS rules to override the default Gradio theme:
 * **Chrome Removal:** Hide the default Gradio footer, "Built with Gradio" badges, and unnecessary padding around the main container.
 
 ## 3. Component Layout & Structure
-The app should utilize a single-column, centered layout (`gr.Column(elem_classes="main-container")`). 
+The app should utilize a single-column, centered layout (`gr.Column(elem_classes="main-container")`). The experience is sentence-first; the UI should not expose separate phonics/CVC/sentence level controls during the hackathon MVP.
 
 ### Header: The Architecture Toggle
 * **Mode Switch:** A small, unobtrusive `gr.Radio` or `gr.Dropdown` at the top allowing the user to select between `⚡ Turbo Mode (Modal)` and `🏕️ Off the Grid Mode (Local)`. This controls whether the backend endpoints execute locally or in the cloud.
@@ -25,6 +25,7 @@ The app should utilize a single-column, centered layout (`gr.Column(elem_classes
 * To allow the child to click individual words for audio assistance, the text must be rendered dynamically via `gr.HTML`.
 * Every word in a sentence must be wrapped in a clickable `<span>` tag with a specific CSS class (e.g., `<span class="clickable-word" onclick="...">Word</span>`).
 * Hovering over a word should highlight it (e.g., change background to soft yellow) to indicate it is interactive.
+* The canvas should display one short sentence at a time from the fixed MVP curriculum.
 
 ### Middle: The Interaction Zone
 * **Record Button:** Use `gr.Audio(sources=["microphone"], type="filepath")`. 
@@ -32,10 +33,10 @@ The app should utilize a single-column, centered layout (`gr.Column(elem_classes
 
 ### Bottom: The Reward & Control Container
 * **Feedback Display (`gr.HTML`):** A dedicated, hidden container used exclusively for rendering success animations (e.g., CSS keyframe bouncing stars, confetti emojis, or a smiling mascot).
-* **Navigation Controls:** Two simple, oversized buttons: "Next Word" and "Listen to Sentence" (triggers the full sentence TTS). 
+* **Navigation Controls:** Two simple, oversized buttons: "Next Sentence" and "Listen to Sentence" (triggers the full sentence TTS). Existing button labels may say "Next Level" during polish, but the product behavior is sentence advancement.
 
 ## 4. Frontend-to-Backend Event Mapping
 Codex must wire the Gradio events as follows:
-* **Event 1 (The Read Attempt):** When the `gr.Audio` component finishes recording (`.stop_recording()` or `.change()`), it immediately triggers the Python evaluation function (which calls the Modal ASR endpoint). The UI should display a simple, child-friendly loading state (like a spinning star) during inference.
-* **Event 2 (Word Click Assist):** Clicking a `<span>` in the Reading Canvas triggers a Gradio custom JS event that passes the specific word string back to the Python backend to call the Modal TTS endpoint.
-* **Event 3 (Success State):** If the evaluation function returns `True`, update the Feedback Display `gr.HTML` to show the success animation, play the TTS praise, and auto-load the next level payload after 2.5 seconds.
+* **Event 1 (The Read Attempt):** When the `gr.Audio` component finishes recording (`.stop_recording()` or `.change()`), it immediately triggers the Python evaluation function (which routes to local or Modal ASR). The UI should display a simple, child-friendly loading state (like a spinning star) during inference.
+* **Event 2 (Word Click Assist):** Clicking a `<span>` in the Reading Canvas triggers a frontend helper that plays a cached word clip when available and falls back to browser speech synthesis so word clicks do not block the child.
+* **Event 3 (Success State):** If the evaluation function returns `True`, update the Feedback Display `gr.HTML` to show the success animation and auto-load the next sentence after 2.5 seconds.

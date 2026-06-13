@@ -39,10 +39,11 @@ def test_evaluate_reading_accepts_exact_match_without_judge(monkeypatch) -> None
         lambda target, transcript: judge_calls.append((target, transcript)) or False,
     )
 
-    feedback, praise_audio = app.evaluate_reading("/tmp/audio.wav", 0)
+    feedback, praise_audio, success_trigger = app.evaluate_reading("/tmp/audio.wav", 0)
 
     assert "Amazing reading!" in feedback
     assert praise_audio is None
+    assert success_trigger == "SUCCESS"
     assert judge_calls == []
 
 
@@ -58,10 +59,11 @@ def test_evaluate_reading_accepts_minicpm_true_verdict(monkeypatch) -> None:
 
     monkeypatch.setattr(app, "ask_minicpm_judge", fake_judge)
 
-    feedback, praise_audio = app.evaluate_reading("/tmp/audio.wav", 1)
+    feedback, praise_audio, success_trigger = app.evaluate_reading("/tmp/audio.wav", 1)
 
     assert "Amazing reading!" in feedback
     assert praise_audio is None
+    assert success_trigger == "SUCCESS"
     assert judge_calls == [("The dog ran fast.", "dog ran fass")]
 
 
@@ -70,10 +72,11 @@ def test_evaluate_reading_retries_minicpm_false_verdict(monkeypatch) -> None:
     monkeypatch.setattr(app, "synthesize_speech", lambda _text: "/tmp/praise.wav")
     monkeypatch.setattr(app, "ask_minicpm_judge", lambda _target, _transcript: False)
 
-    feedback, praise_audio = app.evaluate_reading("/tmp/audio.wav", 0)
+    feedback, praise_audio, success_trigger = app.evaluate_reading("/tmp/audio.wav", 0)
 
     assert "Nice try!" in feedback
     assert praise_audio is None
+    assert success_trigger == ""
 
 
 def test_next_sentence_cycles_curriculum_clears_outputs_and_starts_word_prewarm(monkeypatch) -> None:
@@ -88,6 +91,7 @@ def test_next_sentence_cycles_curriculum_clears_outputs_and_starts_word_prewarm(
         word_help_output,
         tts_status,
         ready_audio,
+        success_trigger,
     ) = app.next_sentence(3)
 
     assert next_index == 0
@@ -99,6 +103,7 @@ def test_next_sentence_cycles_curriculum_clears_outputs_and_starts_word_prewarm(
     assert word_help_output is None
     assert "Getting word voices ready... 0/3" in tts_status
     assert json.loads(ready_audio) == {}
+    assert success_trigger == ""
 
 
 def test_reading_canvas_uses_browser_tts_for_word_clicks() -> None:

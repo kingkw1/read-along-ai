@@ -1,7 +1,9 @@
-# Read-Along AI: 9-Day Development Roadmap & Architecture Strategy
+# Read-Along AI: Hackathon Roadmap & Architecture Strategy
 
 ## 1. Development Philosophy
-This hackathon sprint is strictly time-boxed. The primary directive is to secure a fully functional Minimum Viable Product (MVP) as fast as possible, test the highest-risk technical hurdles immediately after, and save the UI gamification for the final polish.
+This hackathon sprint is strictly time-boxed. The primary directive is to ship a reliable sentence-reading MVP, prove the highest-risk model integrations, and keep the final surface simple enough for a young reader to use without instruction.
+
+The original multi-level reading plan has been deferred. The submission MVP is sentence-first: one short sentence at a time, clickable word help, full-sentence read-back, ASR transcription, MiniCPM phonetic judging, and immediate visual feedback.
 
 ## 2. Phase 1: The Barebones MVP (Days 1–4)
 *Goal: Establish a bulletproof, end-to-end event loop using "safe" cloud endpoints before attempting local deployment.*
@@ -15,13 +17,13 @@ This hackathon sprint is strictly time-boxed. The primary directive is to secure
 * **Verification Checkpoint 1:** **Run the Gradio app locally. Manually verify that clicking "Record" correctly captures audio and triggers the mock success state (confetti animation) without any stack trace errors in the terminal.**
 
 ### Days 3–4: Modal Plumbing & Core Logic
-* **Objective:** Connect the real brains and build the progression logic.
+* **Objective:** Connect the real brains and build the sentence-reading loop.
 * **Tasks:**
   * Deploy `modal_inference.py` containing the `run_cohere_asr` and `run_voxcpm_tts` endpoints.
   * Connect the Gradio UI to the Modal endpoints via abstraction wrappers.
-  * Implement the progression states (Phonics -> CVC -> Sentences) and an initial tolerant matcher.
+  * Implement the sentence curriculum loop and an initial tolerant matcher.
   * *Checkpoint:* The app is now fully functional. If everything else fails, this is your submission.
-* **Verification Checkpoint 2:** **Run `pytest test_backend.py` to verify Modal ASR and TTS endpoints return the correct JSON/bytes. Then, use `gradio.Client` to pass a test audio file through the full UI pipeline to confirm end-to-end integration.**
+* **Verification Checkpoint 2:** **Run `RUN_MODAL_INTEGRATION=1 pytest tests/test_modal_integration.py` to verify Modal ASR and TTS endpoints return the correct JSON/bytes. Then, use `gradio.Client` or the live UI to pass a test audio file through the full app pipeline.**
 
 ## 3. Phase 2: The Fine-Tuned Evaluator (Days 5–6)
 *Goal: Secure the "Well-Tuned" badge and improve child-speech scoring with a published small model.*
@@ -38,7 +40,7 @@ This hackathon sprint is strictly time-boxed. The primary directive is to secure
   * Expose `run_minicpm_evaluator` in `modal_inference.py`.
   * Route non-exact app matches through a MiniCPM wrapper such as `ask_minicpm_judge`.
   * Test deliberate mistakes such as "the dogs ran fast" against "the dog ran fast" to ensure the evaluator does not over-accept semantically different readings.
-  * Keep the legacy edit-distance matcher only as an explicitly documented fallback during transition.
+  * Remove broad edit-distance acceptance from the final app path so wrong readings are not accepted too easily.
 * **Verification Checkpoint 3:** **Run the post-tuning notebook and manually test close-but-wrong readings in the Gradio app. The demo should show both recovered child-speech variants and rejected wrong readings.**
 
 ### Day 6: The Dual-Mode Hybrid Engine (Edge Integration)
@@ -60,13 +62,14 @@ This hackathon sprint is strictly time-boxed. The primary directive is to secure
 * **Tasks:**
   * Inject the custom CSS rules to overhaul the Gradio interface.
   * Trigger the hidden HTML CSS animations (stars/confetti) upon successful reads.
-  * Ensure the text sizing and colors are optimized for a 4-to-7-year-old's accessibility.
+  * Ensure the sentence text, microphone control, retry state, and word-help state are optimized for a young reader's accessibility.
+  * Keep the visible workflow focused on sentence practice; do not reintroduce separate reading-level controls for the hackathon submission.
 
 ### Day 8: Field Testing & Demo Recording
 * **Objective:** Fulfill the *Backyard AI* criteria and target the "Best Demo" award.
 * **Tasks:**
-  * Put the app in front of the target users (ages 4, 6, and 7).
-  * Record the final demo video showing real, authentic usage. Focus heavily on narrative: clearly film the *problem* (e.g., frustration of reading practice) followed by the *solution* (the joy of the interactive confetti animation). Storytelling counts as much as the build!
+  * Put the app in front of the target user(s).
+  * Record the final demo video showing real, authentic usage. Focus heavily on narrative: clearly film the reading-practice friction followed by the sentence-reading loop, word help, and success feedback. Storytelling counts as much as the build!
   * Draft the required social media post.
 
 ### Day 9: Final Submission & The Cleanup Badges
@@ -87,3 +90,6 @@ This hackathon sprint is strictly time-boxed. The primary directive is to secure
   * Implement word-level timestamp extraction from the ASR model.
 * **Product Impact:** Give early readers immediate visual confirmation by synchronizing spoken words with on-screen highlights, reducing the delay between effort and feedback.
 * **Engineering Rationale:** The hackathon MVP deliberately favors stable batch-style inference over streaming complexity so the core reading loop remains reliable during the 9-day sprint. V2 can introduce real-time streaming once the baseline experience is proven.
+
+## 6. Deferred Product Ideas
+The earlier phonics and CVC levels remain useful future ideas, but they are not part of the current submission target. They should be revisited only after the sentence-reading MVP is deployed, tested, and documented.

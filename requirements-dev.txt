@@ -1,0 +1,11 @@
+-r requirements.txt
+
+pandas
+jupyter
+ipykernel
+nbformat
+nbclient
+peft==0.10.0
+trl==0.8.6
+bitsandbytes
+datasets

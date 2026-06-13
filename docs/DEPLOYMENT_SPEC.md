@@ -20,15 +20,22 @@ Codex must generate and organize the repository using the following flat structu
 * Use standard `modal.App.lookup()` or direct Modal Python Client invocation methods to trigger the endpoints defined in `modal_inference.py` securely.
 
 ## 4. Dependencies (`requirements.txt`)
-The `requirements.txt` file must be kept as lightweight as possible to ensure fast boot times on the Hugging Face Space. Codex should include:
-* `gradio` (Specify a stable, recent version, e.g., `gradio>=4.0.0`)
-* `modal` (For the client-side RPC calls)
-* `python-Levenshtein` or `thefuzz` only if the legacy local fuzzy matcher remains enabled.
-* *Note: Heavy ML dependencies like `torch`, `transformers`, or the `cohere` SDK must NOT be in this file. They belong strictly in the image definition of the Modal functions in `modal_inference.py`.*
-* *Note: MiniCPM evaluator dependencies (`torch`, `transformers==4.40.2`, `accelerate`, `sentencepiece`) belong in the dedicated Modal image for `run_minicpm_evaluator`, not in the Space runtime.*
+The deployment has two possible runtime profiles:
+
+* **Modal-first Space:** Keep Space dependencies light (`gradio`, `modal`) and route heavy inference to `modal_inference.py`.
+* **Off the Grid Space:** Include the local inference stack needed by `local_inference.py`, including `faster-whisper`, VoxCPM/Torch dependencies, and `llama-cpp-python` plus the GGUF MiniCPM evaluator artifact.
+
+The final `requirements.txt` should match the selected Space strategy before upload. Training-only dependencies (`peft`, `trl`, `bitsandbytes`, notebooks, and data-prep tooling) are useful for development but should be removed from the submitted Space unless they are required at runtime.
+
+Development and training dependencies are tracked separately in `requirements-dev.txt`.
+
+Heavy Modal-side dependencies remain defined in `modal_inference.py` images:
+* Cohere ASR and VoxCPM dependencies live in the shared inference image.
+* MiniCPM evaluator dependencies (`torch`, `transformers==4.40.2`, `accelerate`, `sentencepiece`) live in the dedicated evaluator image.
 
 ## 5. Deployment Execution Flow
 When the developer pushes to the main branch, the expected execution flow is:
 1. **Backend Deploy:** The developer runs `modal deploy modal_inference.py` locally to push the ASR, TTS, and MiniCPM evaluator endpoints to the cloud.
-2. **Frontend Sync:** The Hugging Face Space automatically rebuilds using the GitHub repository integration.
-3. **Runtime:** When a user visits the Space, `app.py` boots up the Gradio UI, and any audio events trigger the authenticated Modal client to route the payloads to the pre-deployed serverless functions.
+2. **Frontend Sync:** The Hugging Face Space automatically rebuilds using the GitHub repository integration or direct Space upload.
+3. **Runtime:** When a user visits the Space, `app.py` boots up the Gradio UI. The inference-engine toggle routes read attempts through either Modal endpoints or local inference, depending on the selected mode and deployed assets.
+4. **Submission Verification:** Before claiming Off the Grid or Llama Champion, manually verify the submitted Space can complete a read attempt in local mode without calling Modal.
