@@ -840,6 +840,7 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 
 .reading-sentence {
   align-items: center;
+  color: #111827;
   display: flex;
   flex-wrap: wrap;
   font-size: clamp(3.25rem, 9vw, 5.4rem);
@@ -892,9 +893,21 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 #mic-capture button[aria-label*='Speed'],
 #mic-capture button[aria-label*='Playback speed'],
 #mic-capture [aria-label*='microphone' i],
+#mic-capture [aria-label*='input device' i],
+#mic-capture [title*='microphone' i],
+#mic-capture [title*='headset' i],
+#mic-capture [title*='input device' i],
 #mic-capture [class*='warning' i],
 #mic-capture [class*='error' i],
 #mic-capture [data-testid*='toast' i] {
+  display: none !important;
+}
+
+#mic-capture select,
+#mic-capture option,
+#mic-capture [role='combobox'],
+#mic-capture [class*='device' i],
+#mic-capture [class*='source' i] {
   display: none !important;
 }
 
@@ -925,6 +938,7 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 
 .feedback-card {
   border-radius: 34px;
+  color: var(--readalong-navy);
   min-height: 96px;
   padding: 0.95rem;
   text-align: center;
@@ -933,9 +947,10 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 .feedback-hidden { display: none; }
 .feedback-loading { background: #fff5c7; font-size: 1.8rem; font-weight: 900; }
 .feedback-success { background: var(--readalong-mint); border: 5px solid var(--readalong-green); color: #145c38; }
-.feedback-retry { background: #ffe4df; border: 5px solid var(--readalong-coral); }
+.feedback-retry { background: #ffe4df; border: 5px solid var(--readalong-coral); color: #7a1f18; }
 .feedback-title { font-size: clamp(1.65rem, 4vw, 2.45rem); font-weight: 900; }
 .feedback-subtitle { font-size: clamp(1rem, 2.4vw, 1.35rem); font-weight: 800; }
+.feedback-card * { color: inherit !important; }
 .star-row { font-size: clamp(1.8rem, 4.5vw, 3rem); line-height: 1; }
 .star-row span, .spinner-star { display: inline-block; animation: bounce-star 780ms infinite alternate ease-in-out; }
 .star-row span:nth-child(2) { animation-delay: 120ms; }
@@ -1091,8 +1106,16 @@ FRONTEND_JS = """
 
       root.querySelectorAll('button, [role="button"]').forEach((button) => {
         const label = (button.getAttribute('aria-label') || button.getAttribute('title') || button.textContent || '').trim();
-        if (/speed|1x|1\\.0x|playback rate/i.test(label)) {
+        if (/speed|1x|1\\.0x|playback rate|microphone|headset|input device|g733/i.test(label)) {
           button.style.display = 'none';
+        }
+      });
+
+      root.querySelectorAll('*').forEach((node) => {
+        if (node.children.length > 0) return;
+        const text = (node.textContent || '').trim();
+        if (/microphone|headset|input device|g733/i.test(text)) {
+          node.style.display = 'none';
         }
       });
     };
