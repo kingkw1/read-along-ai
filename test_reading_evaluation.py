@@ -8,7 +8,7 @@ import app
 def test_evaluate_reading_accepts_exact_match_without_judge(monkeypatch) -> None:
     judge_calls: list[tuple[str, str]] = []
 
-    monkeypatch.setattr(app, "transcribe_audio", lambda _path: "the dog ran fast")
+    monkeypatch.setattr(app, "transcribe_audio", lambda _path: "the cat sat")
     monkeypatch.setattr(app, "synthesize_speech", lambda _text: "/tmp/praise.wav")
     monkeypatch.setattr(
         app,
@@ -35,7 +35,7 @@ def test_evaluate_reading_accepts_minicpm_true_verdict(monkeypatch) -> None:
 
     monkeypatch.setattr(app, "ask_minicpm_judge", fake_judge)
 
-    feedback, praise_audio = app.evaluate_reading("/tmp/audio.wav", 0)
+    feedback, praise_audio = app.evaluate_reading("/tmp/audio.wav", 1)
 
     assert "Amazing reading!" in feedback
     assert praise_audio == "/tmp/praise.wav"
@@ -51,6 +51,18 @@ def test_evaluate_reading_retries_minicpm_false_verdict(monkeypatch) -> None:
 
     assert "Nice try!" in feedback
     assert praise_audio is None
+
+
+def test_next_sentence_cycles_curriculum_and_clears_outputs() -> None:
+    next_index, sentence_html, microphone, feedback, speech_output, word_help_output = app.next_sentence(3)
+
+    assert next_index == 0
+    assert "The" in sentence_html
+    assert "cat" in sentence_html
+    assert "feedback-hidden" in feedback
+    assert microphone is None
+    assert speech_output is None
+    assert word_help_output is None
 
 
 def test_ask_minicpm_judge_parses_true_verdict(monkeypatch) -> None:

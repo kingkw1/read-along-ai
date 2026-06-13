@@ -24,17 +24,7 @@ TURBO_ENGINE = "⚡ Turbo Mode (Modal)"
 LOCAL_ENGINE = "🏕️ Off the Grid Mode (Local)"
 INFERENCE_ENGINES = [TURBO_ENGINE, LOCAL_ENGINE]
 
-TARGET_SENTENCES = [
-    "The dog ran fast.",
-    "M",
-    "C",
-    "S",
-    "cat",
-    "dog",
-    "mat",
-    "A cat sat on a mat.",
-    "We can read and play.",
-]
+CURRICULUM = ["The cat sat.", "The dog ran fast.", "She had a red hat.", "I love to play outside."]
 
 SAMPLE_RATE = 16_000
 DUMMY_AUDIO_SECONDS = 1
@@ -195,9 +185,9 @@ def _call_with_engine(function, *args, inference_engine: str):
 
 
 def evaluate_reading(audio_filepath: str, current_index: int, inference_engine: str = TURBO_ENGINE) -> tuple[str, Optional[str]]:
-    """Evaluate one read attempt and return feedback HTML plus optional praise audio."""
+    """Evaluate one read attempt against the active curriculum sentence."""
     transcript = _call_with_engine(transcribe_audio, audio_filepath, inference_engine=inference_engine)
-    target_sentence = TARGET_SENTENCES[current_index]
+    target_sentence = CURRICULUM[int(current_index) % len(CURRICULUM)]
     print(
         f"[read-along] engine={inference_engine!r} target={target_sentence!r} transcript={transcript!r}",
         flush=True,
@@ -214,14 +204,14 @@ def evaluate_reading(audio_filepath: str, current_index: int, inference_engine: 
     return retry_feedback(), None
 
 
-def next_sentence(current_index: int) -> tuple[int, str, str]:
-    """Advance to the next sentence and clear feedback."""
-    next_index = (current_index + 1) % len(TARGET_SENTENCES)
-    return next_index, render_reading_canvas(TARGET_SENTENCES[next_index]), hidden_feedback()
+def next_sentence(idx: int) -> tuple[int, str, None, str, None, None]:
+    """Advance to the next curriculum sentence and clear transient outputs."""
+    next_index = (int(idx) + 1) % len(CURRICULUM)
+    return next_index, render_reading_canvas(CURRICULUM[next_index]), None, hidden_feedback(), None, None
 
 
 def listen_to_sentence(current_index: int, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
-    return synthesize_speech(TARGET_SENTENCES[current_index], inference_engine)
+    return synthesize_speech(CURRICULUM[int(current_index) % len(CURRICULUM)], inference_engine)
 
 
 def update_audio_help(clicked_word: str, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
@@ -439,7 +429,7 @@ FRONTEND_JS = """
 
 def build_app() -> gr.Blocks:
     with gr.Blocks(css=CUSTOM_CSS, title="Read-Along AI", head=FRONTEND_JS) as demo:
-        sentence_index = gr.State(0)
+        current_index = gr.State(0)
 
         gr.HTML('<h1 class="app-title">Read-Along AI</h1>')
         with gr.Column(elem_classes="main-container"):
@@ -449,7 +439,7 @@ def build_app() -> gr.Blocks:
                 label="Inference Engine",
                 elem_classes="engine-toggle",
             )
-            reading_canvas = gr.HTML(render_reading_canvas(TARGET_SENTENCES[0]))
+            reading_canvas = gr.HTML(render_reading_canvas(CURRICULUM[0]))
 
             with gr.Column(elem_classes="interaction-zone"):
                 microphone = gr.Audio(
@@ -464,7 +454,7 @@ def build_app() -> gr.Blocks:
             word_help_output = gr.Audio(label="Word helper voice", autoplay=True, visible="hidden")
 
             with gr.Row():
-                next_button = gr.Button("Next Word ➜", elem_classes="control-button", elem_id="next-word-button", variant="secondary")
+                next_button = gr.Button("Next Level ➡️", elem_classes="control-button", elem_id="next-word-button", variant="secondary")
                 listen_button = gr.Button("🔊 Listen to Sentence", elem_classes="control-button", variant="primary")
 
             word_click_target = gr.Textbox(visible="hidden", elem_id="word-click-target")
@@ -477,19 +467,19 @@ def build_app() -> gr.Blocks:
             show_progress="hidden",
         ).then(
             fn=evaluate_reading,
-            inputs=[microphone, sentence_index, inference_engine],
+            inputs=[microphone, current_index, inference_engine],
             outputs=[feedback_display, speech_output],
         )
 
         next_button.click(
             fn=next_sentence,
-            inputs=sentence_index,
-            outputs=[sentence_index, reading_canvas, feedback_display],
+            inputs=current_index,
+            outputs=[current_index, reading_canvas, microphone, feedback_display, speech_output, word_help_output],
         )
 
         listen_button.click(
             fn=listen_to_sentence,
-            inputs=[sentence_index, inference_engine],
+            inputs=[current_index, inference_engine],
             outputs=speech_output,
         )
 
