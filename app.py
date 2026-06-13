@@ -974,7 +974,7 @@ def build_app() -> gr.Blocks:
         with gr.Column(elem_classes="main-container"):
             inference_engine = gr.Radio(
                 choices=INFERENCE_ENGINES,
-                value=LOCAL_ENGINE,
+                value=TURBO_ENGINE,
                 label="Inference Engine",
                 elem_classes="engine-toggle",
             )

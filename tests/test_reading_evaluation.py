@@ -140,7 +140,7 @@ def test_tts_outputs_are_hidden_but_mounted_for_autoplay() -> None:
     assert word_help_output.autoplay is True
 
 
-def test_app_defaults_to_off_the_grid_mode() -> None:
+def test_app_defaults_to_turbo_mode() -> None:
     demo = app.build_app()
     engine_radios = [
         block
@@ -149,7 +149,7 @@ def test_app_defaults_to_off_the_grid_mode() -> None:
     ]
 
     assert len(engine_radios) == 1
-    assert engine_radios[0].value == app.LOCAL_ENGINE
+    assert engine_radios[0].value == app.TURBO_ENGINE
 
 
 def test_format_text_for_tts_pads_single_words_only() -> None:
