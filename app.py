@@ -11,6 +11,7 @@ import html
 import io
 import inspect
 import json
+import logging
 import re
 import tempfile
 import threading
@@ -21,7 +22,11 @@ from typing import Optional
 import gradio as gr
 import modal
 
-from local_inference import local_ask_minicpm_judge, local_synthesize_speech, local_transcribe_audio
+from local_inference import _load_whisper_model, local_ask_minicpm_judge, local_synthesize_speech, local_transcribe_audio
+
+LOGGER = logging.getLogger(__name__)
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 MODAL_APP_NAME = "read-along-ai-inference"
 TURBO_ENGINE = "⚡ Turbo Mode (Modal)"
@@ -29,7 +34,7 @@ LOCAL_ENGINE = "🏕️ Off the Grid Mode (Local)"
 INFERENCE_ENGINES = [TURBO_ENGINE, LOCAL_ENGINE]
 
 CURRICULUM = ["The cat sat.", "The dog ran fast.", "She had a red hat.", "I love to play outside."]
-TTS_MEMORY_CACHE: dict[str, bytes] = {}
+TTS_MEMORY_CACHE: dict[tuple[str, str], bytes] = {}
 TTS_PREWARM_STATUS: dict[str, object] = {
     "sentence": "",
     "total": 0,
@@ -37,6 +42,8 @@ TTS_PREWARM_STATUS: dict[str, object] = {
     "failed": 0,
     "running": False,
     "ready_words": [],
+    "clip_method": "",
+    "fallback_reason": "",
 }
 TTS_CACHE_LOCK = threading.Lock()
 
@@ -157,6 +164,10 @@ def sentence_tts_words(sentence: str) -> list[str]:
     return words
 
 
+def tts_cache_key(sentence: str, word: str) -> tuple[str, str]:
+    return normalize_text(sentence), clean_tts_word(word)
+
+
 def wav_duration_seconds(audio_bytes: bytes) -> float:
     with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
         return wav_file.getnframes() / float(wav_file.getframerate())
@@ -170,47 +181,155 @@ def _write_wav_clip(params: wave._wave_params, frames: bytes) -> bytes:
     return output.getvalue()
 
 
-def slice_sentence_audio_by_words(sentence: str, audio_bytes: bytes) -> dict[str, bytes]:
-    """Approximate word clips by splitting sentence audio by word character weight."""
-    words = sentence_tts_words(sentence)
-    if not words:
-        return {}
-
+def _slice_wav_by_seconds(audio_bytes: bytes, start_seconds: float, end_seconds: float) -> Optional[bytes]:
+    """Return a WAV clip for a timestamp range, padded and clamped to the source audio."""
     with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
         params = wav_file.getparams()
         total_frames = wav_file.getnframes()
         all_frames = wav_file.readframes(total_frames)
 
+    if total_frames <= 0 or end_seconds <= start_seconds:
+        return None
+
+    padding_frames = int(params.framerate * WORD_CLIP_PADDING_SECONDS)
+    start_frame = max(0, int(start_seconds * params.framerate) - padding_frames)
+    end_frame = min(total_frames, int(end_seconds * params.framerate) + padding_frames)
+    if end_frame <= start_frame:
+        return None
+
+    bytes_per_frame = params.nchannels * params.sampwidth
+    return _write_wav_clip(params, all_frames[start_frame * bytes_per_frame : end_frame * bytes_per_frame])
+
+
+def align_sentence_audio_words(sentence: str, audio_bytes: bytes) -> dict[str, tuple[float, float]]:
+    """Align generated sentence audio to target words using local faster-whisper word timestamps.
+
+    The generated sentence is known, so this accepts only sequential timestamp
+    matches for every unique target word. Any mismatch, missing timestamp, or
+    obviously unusable boundary raises ``ValueError`` so callers can use the
+    proportional slicer fallback.
+    """
+    target_words = sentence_tts_words(sentence)
+    if not target_words:
+        return {}
+
+    LOGGER.info("Starting word alignment for %d target words", len(target_words))
+    audio_path = write_tts_audio_file("alignment_sentence", audio_bytes)
+    model = _load_whisper_model()
+    segments, _info = model.transcribe(
+        audio_path,
+        language="en",
+        beam_size=1,
+        vad_filter=False,
+        word_timestamps=True,
+        condition_on_previous_text=False,
+    )
+
+    recognized_words: list[tuple[str, float, float]] = []
+    for segment in segments:
+        for word_info in getattr(segment, "words", []) or []:
+            word = clean_tts_word(getattr(word_info, "word", ""))
+            start = getattr(word_info, "start", None)
+            end = getattr(word_info, "end", None)
+            probability = getattr(word_info, "probability", None)
+            if not word or start is None or end is None:
+                continue
+            if probability is not None and float(probability) < 0.2:
+                continue
+            recognized_words.append((word, float(start), float(end)))
+
+    audio_duration = wav_duration_seconds(audio_bytes)
+    timestamps: dict[str, tuple[float, float]] = {}
+    search_index = 0
+    for target_word in target_words:
+        while search_index < len(recognized_words) and recognized_words[search_index][0] != target_word:
+            search_index += 1
+        if search_index >= len(recognized_words):
+            raise ValueError(f"missing aligned word timestamp for {target_word!r}")
+
+        _word, start, end = recognized_words[search_index]
+        search_index += 1
+        if start < 0 or end <= start or end > audio_duration + WORD_CLIP_PADDING_SECONDS:
+            raise ValueError(f"unusable aligned timestamp for {target_word!r}: {start}-{end}")
+        timestamps.setdefault(target_word, (start, min(end, audio_duration)))
+
+    LOGGER.info("Word alignment succeeded for %d/%d target words", len(timestamps), len(target_words))
+    return timestamps
+
+
+def slice_sentence_audio_by_timestamps(
+    sentence: str, audio_bytes: bytes, word_timestamps: dict[str, tuple[float, float]]
+) -> dict[str, bytes]:
+    """Slice sentence WAV bytes into word clips from exact timestamp boundaries."""
+    clips: dict[str, bytes] = {}
+    for word in sentence_tts_words(sentence):
+        timestamp = word_timestamps.get(word)
+        if timestamp is None:
+            raise ValueError(f"missing timestamp for {word!r}")
+        clip = _slice_wav_by_seconds(audio_bytes, timestamp[0], timestamp[1])
+        if clip is None:
+            raise ValueError(f"invalid timestamp for {word!r}")
+        clips.setdefault(word, clip)
+    return clips
+
+
+def slice_sentence_audio_with_alignment_or_fallback(
+    sentence: str, audio_bytes: bytes, method_report: Optional[dict[str, str]] = None
+) -> dict[str, bytes]:
+    """Prefer local word alignment for clips, falling back to proportional slicing on failure."""
+    try:
+        timestamps = align_sentence_audio_words(sentence, audio_bytes)
+        clips = slice_sentence_audio_by_timestamps(sentence, audio_bytes, timestamps)
+        if method_report is not None:
+            method_report.update({"method": "alignment", "fallback_reason": ""})
+        LOGGER.info("Using aligned word clips for sentence %r", sentence)
+        return clips
+    except Exception as exc:
+        if method_report is not None:
+            method_report.update({"method": "proportional_fallback", "fallback_reason": str(exc)})
+        LOGGER.warning("Using proportional word-clip fallback for sentence %r: %s", sentence, exc)
+        return slice_sentence_audio_by_words(sentence, audio_bytes)
+
+
+def slice_sentence_audio_by_words(sentence: str, audio_bytes: bytes) -> dict[str, bytes]:
+    """Approximate word clips by splitting sentence audio by word character weight."""
+    timestamps = proportional_word_timestamps(sentence, audio_bytes)
+    return slice_sentence_audio_by_timestamps(sentence, audio_bytes, timestamps)
+
+
+def proportional_word_timestamps(sentence: str, audio_bytes: bytes) -> dict[str, tuple[float, float]]:
+    """Approximate word timestamps by splitting sentence audio by word character weight."""
+    words = sentence_tts_words(sentence)
+    if not words:
+        return {}
+
+    with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
+        total_frames = wav_file.getnframes()
+        frame_rate = wav_file.getframerate()
+
     if total_frames <= 0:
         return {}
 
-    bytes_per_frame = params.nchannels * params.sampwidth
     weights = [max(len(word), 1) for word in words]
     total_weight = sum(weights)
-    padding_frames = int(params.framerate * WORD_CLIP_PADDING_SECONDS)
 
-    clips: dict[str, bytes] = {}
+    timestamps: dict[str, tuple[float, float]] = {}
     elapsed_weight = 0
     for word, weight in zip(words, weights):
         start_frame = int(total_frames * elapsed_weight / total_weight)
         elapsed_weight += weight
         end_frame = int(total_frames * elapsed_weight / total_weight)
+        if end_frame > start_frame:
+            timestamps.setdefault(word, (start_frame / frame_rate, end_frame / frame_rate))
 
-        padded_start = max(0, start_frame - padding_frames)
-        padded_end = min(total_frames, end_frame + padding_frames)
-        if padded_end <= padded_start:
-            continue
-
-        start_byte = padded_start * bytes_per_frame
-        end_byte = padded_end * bytes_per_frame
-        clips.setdefault(word, _write_wav_clip(params, all_frames[start_byte:end_byte]))
-
-    return clips
+    return timestamps
 
 
 def _initialize_prewarm_status(sentence: str, words: list[str]) -> None:
     with TTS_CACHE_LOCK:
-        ready_words = [word for word in words if word in TTS_MEMORY_CACHE]
+        TTS_MEMORY_CACHE.clear()
+        sentence_key = normalize_text(sentence)
+        ready_words = [word for word in words if (sentence_key, word) in TTS_MEMORY_CACHE]
         TTS_PREWARM_STATUS.update(
             {
                 "sentence": sentence,
@@ -219,6 +338,8 @@ def _initialize_prewarm_status(sentence: str, words: list[str]) -> None:
                 "failed": 0,
                 "running": len(ready_words) < len(words),
                 "ready_words": ready_words,
+                "clip_method": "cache" if ready_words else "",
+                "fallback_reason": "",
             }
         )
 
@@ -229,7 +350,8 @@ def prewarm_level_words(sentence: str, engine_mode: str) -> None:
     _initialize_prewarm_status(sentence, words)
 
     with TTS_CACHE_LOCK:
-        missing_words = [word for word in words if word not in TTS_MEMORY_CACHE]
+        sentence_key = normalize_text(sentence)
+        missing_words = [word for word in words if (sentence_key, word) not in TTS_MEMORY_CACHE]
     if not missing_words:
         with TTS_CACHE_LOCK:
             if TTS_PREWARM_STATUS.get("sentence") == sentence:
@@ -238,12 +360,19 @@ def prewarm_level_words(sentence: str, engine_mode: str) -> None:
 
     try:
         sentence_audio = synthesize_speech_bytes(sentence, engine_mode)
-        word_clips = slice_sentence_audio_by_words(sentence, sentence_audio)
-    except Exception:
+        method_report: dict[str, str] = {}
+        word_clips = slice_sentence_audio_with_alignment_or_fallback(sentence, sentence_audio, method_report)
+        with TTS_CACHE_LOCK:
+            if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                TTS_PREWARM_STATUS["clip_method"] = method_report.get("method", "")
+                TTS_PREWARM_STATUS["fallback_reason"] = method_report.get("fallback_reason", "")
+    except Exception as exc:
+        LOGGER.exception("Word voice prewarm failed for sentence %r", sentence)
         with TTS_CACHE_LOCK:
             if TTS_PREWARM_STATUS.get("sentence") == sentence:
                 TTS_PREWARM_STATUS["failed"] = int(TTS_PREWARM_STATUS.get("failed", 0)) + len(missing_words)
                 TTS_PREWARM_STATUS["running"] = False
+                TTS_PREWARM_STATUS["fallback_reason"] = str(exc)
         return
 
     for word in missing_words:
@@ -254,8 +383,8 @@ def prewarm_level_words(sentence: str, engine_mode: str) -> None:
                     TTS_PREWARM_STATUS["failed"] = int(TTS_PREWARM_STATUS.get("failed", 0)) + 1
             continue
         with TTS_CACHE_LOCK:
-            TTS_MEMORY_CACHE.setdefault(word, audio_bytes)
             if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                TTS_MEMORY_CACHE.setdefault(tts_cache_key(sentence, word), audio_bytes)
                 ready_words = list(TTS_PREWARM_STATUS.get("ready_words", []))
                 if word not in ready_words:
                     ready_words.append(word)
@@ -282,10 +411,11 @@ def start_word_voice_prewarm(sentence: str) -> tuple[str, str]:
 def current_tts_status() -> tuple[str, str]:
     with TTS_CACHE_LOCK:
         status = dict(TTS_PREWARM_STATUS)
+        sentence = str(status.get("sentence", ""))
         ready_audio = {
-            word: f"data:audio/wav;base64,{base64.b64encode(TTS_MEMORY_CACHE[word]).decode('ascii')}"
+            word: f"data:audio/wav;base64,{base64.b64encode(TTS_MEMORY_CACHE[tts_cache_key(sentence, word)]).decode('ascii')}"
             for word in status.get("ready_words", [])
-            if word in TTS_MEMORY_CACHE
+            if tts_cache_key(sentence, word) in TTS_MEMORY_CACHE
         }
 
     return render_tts_status(status), json.dumps(ready_audio)
@@ -299,13 +429,23 @@ def render_tts_status(status: dict[str, object]) -> str:
     ready = int(status.get("ready", 0))
     failed = int(status.get("failed", 0))
     running = bool(status.get("running", False))
+    clip_method = str(status.get("clip_method", ""))
+    fallback_reason = html.escape(str(status.get("fallback_reason", "")), quote=True)
+    method_label = ""
+    if clip_method == "alignment":
+        method_label = " (aligned)"
+    elif clip_method == "proportional_fallback":
+        method_label = " (proportional fallback)"
+
     if ready >= total:
-        return '<div class="voice-status voice-status-ready">Word voices ready</div>'
+        title = f' title="{fallback_reason}"' if fallback_reason else ""
+        return f'<div class="voice-status voice-status-ready"{title}>Word voices ready{method_label}</div>'
     if running:
-        return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}</div>'
+        return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}{method_label}</div>'
     if failed:
-        return f'<div class="voice-status voice-status-loading">Some word voices need browser backup... {ready}/{total}</div>'
-    return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}</div>'
+        title = f' title="{fallback_reason}"' if fallback_reason else ""
+        return f'<div class="voice-status voice-status-loading"{title}>Some word voices need browser backup... {ready}/{total}{method_label}</div>'
+    return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}{method_label}</div>'
 
 
 def ask_minicpm_judge(target_text: str, transcript: str, inference_engine: str = TURBO_ENGINE) -> bool:
@@ -423,7 +563,9 @@ def listen_to_sentence(current_index: int, inference_engine: str = TURBO_ENGINE)
     return synthesize_speech(CURRICULUM[int(current_index) % len(CURRICULUM)], inference_engine)
 
 
-def update_audio_help(clicked_word: str, inference_engine: str = TURBO_ENGINE) -> Optional[bytes]:
+def update_audio_help(
+    clicked_word: str, inference_engine: str = TURBO_ENGINE, sentence: Optional[str] = None
+) -> Optional[bytes]:
     """Return cached realistic word audio if pre-generation has finished.
 
     Word clicks must not block on local VoxCPM generation. If the audio is not
@@ -434,23 +576,26 @@ def update_audio_help(clicked_word: str, inference_engine: str = TURBO_ENGINE) -
         return None
 
     with TTS_CACHE_LOCK:
-        cached_audio = TTS_MEMORY_CACHE.get(word)
+        active_sentence = sentence if sentence is not None else str(TTS_PREWARM_STATUS.get("sentence", ""))
+        cached_audio = TTS_MEMORY_CACHE.get(tts_cache_key(active_sentence, word))
     if cached_audio is not None:
         return cached_audio
 
     return None
 
 
-def finish_word_click(clicked_word: str, inference_engine: str = TURBO_ENGINE) -> tuple[Optional[str], gr.update]:
+def finish_word_click(
+    clicked_word: str, inference_engine: str = TURBO_ENGINE, sentence: Optional[str] = None
+) -> tuple[Optional[str], gr.update]:
     word = clean_tts_word(clicked_word or "")
-    audio_bytes = update_audio_help(word, inference_engine)
+    audio_bytes = update_audio_help(word, inference_engine, sentence)
     audio_path = write_tts_audio_file(word, audio_bytes) if audio_bytes is not None else None
     return audio_path, gr.update(value=word or "Word helper")
 
 
-def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE) -> Optional[bytes]:
+def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE, sentence: Optional[str] = None) -> Optional[bytes]:
     """Backward-compatible alias for word-level audio help."""
-    return update_audio_help(word, inference_engine)
+    return update_audio_help(word, inference_engine, sentence)
 
 
 CUSTOM_CSS = """

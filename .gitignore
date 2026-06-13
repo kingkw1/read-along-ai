@@ -3,6 +3,7 @@
 __pycache__/
 *.py[cod]
 *.wav
+!data/curriculum_audio/comma/*.wav
 .env
 .env.*
 *.ogg
