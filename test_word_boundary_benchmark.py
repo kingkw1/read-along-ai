@@ -24,6 +24,19 @@ class WordLabel:
 class BoundaryScore:
     hits: int
     total: int
+    mean_abs_error_to_gap_midpoint: float
+    max_error_seconds: float
+
+    @property
+    def accuracy(self) -> float:
+        return self.hits / self.total if self.total else 1.0
+
+
+@dataclass(frozen=True)
+class BenchmarkScore:
+    hits: int
+    total: int
+    mean_abs_error_to_gap_midpoint: float
     max_error_seconds: float
 
     @property
@@ -57,7 +70,8 @@ def score_internal_boundaries(
 ) -> BoundaryScore:
     """Score adjacent word splits against the manually labeled silence gaps."""
     hits = 0
-    max_error = 0.0
+    midpoint_errors: list[float] = []
+    gap_errors: list[float] = []
 
     for previous_label, next_label in zip(labels, labels[1:]):
         previous_timestamp = predicted_timestamps[previous_label.word]
@@ -65,15 +79,33 @@ def score_internal_boundaries(
         predicted_boundary = (previous_timestamp[1] + next_timestamp[0]) / 2.0
         gap_start = previous_label.end
         gap_end = next_label.start
+        gap_midpoint = (gap_start + gap_end) / 2.0
+        midpoint_errors.append(abs(predicted_boundary - gap_midpoint))
 
         if gap_start <= predicted_boundary <= gap_end:
             hits += 1
-            continue
+            gap_errors.append(0.0)
+        else:
+            gap_errors.append(min(abs(predicted_boundary - gap_start), abs(predicted_boundary - gap_end)))
 
-        error = min(abs(predicted_boundary - gap_start), abs(predicted_boundary - gap_end))
-        max_error = max(max_error, error)
+    return BoundaryScore(
+        hits=hits,
+        total=max(len(labels) - 1, 0),
+        mean_abs_error_to_gap_midpoint=sum(midpoint_errors) / len(midpoint_errors) if midpoint_errors else 0.0,
+        max_error_seconds=max(gap_errors) if gap_errors else 0.0,
+    )
 
-    return BoundaryScore(hits=hits, total=max(len(labels) - 1, 0), max_error_seconds=max_error)
+
+def aggregate_scores(scores: list[BoundaryScore]) -> BenchmarkScore:
+    total = sum(score.total for score in scores)
+    return BenchmarkScore(
+        hits=sum(score.hits for score in scores),
+        total=total,
+        mean_abs_error_to_gap_midpoint=(
+            sum(score.mean_abs_error_to_gap_midpoint * score.total for score in scores) / total if total else 0.0
+        ),
+        max_error_seconds=max((score.max_error_seconds for score in scores), default=0.0),
+    )
 
 
 @pytest.mark.parametrize(("sentence", "wav_path", "label_path"), comma_label_cases())
@@ -105,9 +137,10 @@ def test_boundary_scorer_accepts_split_points_anywhere_inside_manual_gaps() -> N
 
     assert score.hits == 2
     assert score.accuracy == 1.0
+    assert score.max_error_seconds == 0.0
 
 
-def test_proportional_baseline_does_not_solve_comma_word_boundaries() -> None:
+def score_proportional_baseline() -> BenchmarkScore:
     scores: list[BoundaryScore] = []
     for sentence, wav_path, label_path in comma_label_cases():
         audio_bytes = wav_path.read_bytes()
@@ -115,19 +148,37 @@ def test_proportional_baseline_does_not_solve_comma_word_boundaries() -> None:
         timestamps = app.proportional_word_timestamps(sentence, audio_bytes)
         scores.append(score_internal_boundaries(labels, timestamps))
 
-    hits = sum(score.hits for score in scores)
-    total = sum(score.total for score in scores)
-
-    assert hits < total
+    return aggregate_scores(scores)
 
 
-@pytest.mark.xfail(reason="Replace proportional timestamps with the candidate edge detector under test.")
-def test_candidate_splitter_lands_every_internal_boundary_in_manual_gap() -> None:
+def score_current_alignment() -> BenchmarkScore:
     scores: list[BoundaryScore] = []
     for sentence, wav_path, label_path in comma_label_cases():
         audio_bytes = wav_path.read_bytes()
         labels = parse_audacity_labels(label_path)
-        candidate_timestamps = app.proportional_word_timestamps(sentence, audio_bytes)
-        scores.append(score_internal_boundaries(labels, candidate_timestamps))
+        timestamps = app.align_sentence_audio_words(sentence, audio_bytes)
+        scores.append(score_internal_boundaries(labels, timestamps))
 
-    assert all(score.accuracy == 1.0 for score in scores)
+    return aggregate_scores(scores)
+
+
+def test_proportional_baseline_does_not_solve_comma_word_boundaries() -> None:
+    baseline = score_proportional_baseline()
+
+    assert baseline.hits < baseline.total
+
+
+def test_current_alignment_is_measured_against_previous_proportional_baseline() -> None:
+    current = score_current_alignment()
+    baseline = score_proportional_baseline()
+
+    assert current.hits == 1
+    assert current.total == 13
+    assert current.accuracy == pytest.approx(1 / 13)
+
+    assert baseline.hits == 0
+    assert baseline.total == 13
+    assert baseline.accuracy == 0.0
+
+    assert current.accuracy > baseline.accuracy
+    assert current.mean_abs_error_to_gap_midpoint < baseline.mean_abs_error_to_gap_midpoint
