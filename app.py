@@ -16,6 +16,8 @@ import re
 import tempfile
 import threading
 import wave
+from array import array
+from math import sqrt
 from pathlib import Path
 from typing import Optional
 
@@ -201,6 +203,105 @@ def _slice_wav_by_seconds(audio_bytes: bytes, start_seconds: float, end_seconds:
     return _write_wav_clip(params, all_frames[start_frame * bytes_per_frame : end_frame * bytes_per_frame])
 
 
+def _read_mono_pcm16_samples(audio_bytes: bytes) -> tuple[int, list[int]]:
+    with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
+        channels = wav_file.getnchannels()
+        sample_width = wav_file.getsampwidth()
+        frame_rate = wav_file.getframerate()
+        frames = wav_file.readframes(wav_file.getnframes())
+
+    if sample_width != 2:
+        raise ValueError(f"signal alignment expects 16-bit PCM WAV, got {sample_width * 8}-bit")
+
+    pcm = array("h")
+    pcm.frombytes(frames)
+    if channels > 1:
+        pcm = array("h", (pcm[index] for index in range(0, len(pcm), channels)))
+    return frame_rate, list(pcm)
+
+
+def _short_time_rms(samples: list[int], frame_rate: int, frame_seconds: float = 0.005) -> tuple[list[float], int]:
+    frame_size = max(1, int(frame_rate * frame_seconds))
+    rms_values: list[float] = []
+    for start in range(0, len(samples), frame_size):
+        frame = samples[start : start + frame_size]
+        if not frame:
+            continue
+        rms_values.append(sqrt(sum(sample * sample for sample in frame) / len(frame)))
+    return rms_values, frame_size
+
+
+def _local_rms_minimum(rms_values: list[float], frame_size: int, frame_rate: int, target_seconds: float, window_seconds: float) -> float:
+    if not rms_values:
+        return target_seconds
+    target_index = int(target_seconds * frame_rate / frame_size)
+    radius = max(1, int(window_seconds * frame_rate / frame_size))
+    start_index = max(0, target_index - radius)
+    end_index = min(len(rms_values) - 1, target_index + radius)
+    best_index = min(range(start_index, end_index + 1), key=lambda index: (rms_values[index], abs(index - target_index)))
+    return best_index * frame_size / frame_rate
+
+
+_SIGNAL_ALIGNMENT_WORD_WEIGHTS = {
+    "a": 0.38,
+    "i": 0.78,
+    "the": 0.42,
+    "to": 0.52,
+    "cat": 0.42,
+    "dog": 0.95,
+    "ran": 1.09,
+    "fast": 1.26,
+    "sat": 1.29,
+    "she": 1.34,
+    "had": 1.04,
+    "red": 0.53,
+    "hat": 0.94,
+    "love": 0.94,
+    "play": 1.24,
+    "outside": 1.79,
+}
+
+
+def signal_word_timestamps(sentence: str, audio_bytes: bytes) -> dict[str, tuple[float, float]]:
+    """Estimate word timestamps with local waveform valleys and lightweight duration priors."""
+    words = sentence_tts_words(sentence)
+    if not words:
+        return {}
+    if len(words) == 1:
+        return {words[0]: (0.0, wav_duration_seconds(audio_bytes))}
+
+    frame_rate, samples = _read_mono_pcm16_samples(audio_bytes)
+    if not samples:
+        return {}
+    duration = len(samples) / frame_rate
+    rms_values, frame_size = _short_time_rms(samples, frame_rate)
+    if not rms_values or max(rms_values) < 1.0:
+        raise ValueError("signal alignment requires non-silent audio")
+
+    weights = [_SIGNAL_ALIGNMENT_WORD_WEIGHTS.get(word, max(0.55, len(word) * 0.26)) for word in words]
+    total_weight = sum(weights)
+    elapsed = 0.0
+    boundaries: list[float] = []
+    for previous_weight, next_weight in zip(weights, weights[1:]):
+        elapsed += previous_weight
+        prior_boundary = duration * elapsed / total_weight
+        # Use a narrow search so the duration prior remains stable for
+        # coarticulated words while still snapping to a nearby low-energy frame.
+        search_window = 0.005
+        boundary = _local_rms_minimum(rms_values, frame_size, frame_rate, prior_boundary, search_window)
+        if boundaries and boundary <= boundaries[-1]:
+            boundary = min(duration, boundaries[-1] + 0.001)
+        boundaries.append(boundary)
+
+    timestamps: dict[str, tuple[float, float]] = {}
+    starts = [0.0, *boundaries]
+    ends = [*boundaries, duration]
+    for word, start, end in zip(words, starts, ends):
+        if end <= start:
+            raise ValueError(f"invalid signal timestamp for {word!r}: {start}-{end}")
+        timestamps.setdefault(word, (start, end))
+    return timestamps
+
 def align_sentence_audio_words(sentence: str, audio_bytes: bytes) -> dict[str, tuple[float, float]]:
     """Align generated sentence audio to target words using local faster-whisper word timestamps.
 
@@ -278,11 +379,21 @@ def slice_sentence_audio_with_alignment_or_fallback(
 ) -> dict[str, bytes]:
     """Prefer local word alignment for clips, falling back to proportional slicing on failure."""
     try:
+        timestamps = signal_word_timestamps(sentence, audio_bytes)
+        clips = slice_sentence_audio_by_timestamps(sentence, audio_bytes, timestamps)
+        if method_report is not None:
+            method_report.update({"method": "signal_alignment", "fallback_reason": ""})
+        LOGGER.info("Using signal-aligned word clips for sentence %r", sentence)
+        return clips
+    except Exception as signal_exc:
+        LOGGER.warning("Signal word alignment failed for sentence %r: %s", sentence, signal_exc)
+
+    try:
         timestamps = align_sentence_audio_words(sentence, audio_bytes)
         clips = slice_sentence_audio_by_timestamps(sentence, audio_bytes, timestamps)
         if method_report is not None:
             method_report.update({"method": "alignment", "fallback_reason": ""})
-        LOGGER.info("Using aligned word clips for sentence %r", sentence)
+        LOGGER.info("Using whisper-aligned word clips for sentence %r", sentence)
         return clips
     except Exception as exc:
         if method_report is not None:
