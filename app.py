@@ -224,8 +224,24 @@ def listen_to_sentence(current_index: int, inference_engine: str = TURBO_ENGINE)
     return synthesize_speech(TARGET_SENTENCES[current_index], inference_engine)
 
 
+def update_audio_help(clicked_word: str, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
+    """Generate audio help for a clicked reading word.
+
+    The reading canvas sends the cleaned word text through a hidden Gradio
+    textbox/button bridge because the words are rendered as accessible HTML
+    controls. Returning the WAV filepath to the autoplay Audio component makes
+    the browser play the helper audio immediately.
+    """
+    word = (clicked_word or "").strip()
+    if not word:
+        return None
+
+    return _call_with_engine(synthesize_speech, word, inference_engine=inference_engine)
+
+
 def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
-    return synthesize_speech(word or "word", inference_engine)
+    """Backward-compatible alias for word-level audio help."""
+    return update_audio_help(word, inference_engine)
 
 
 CUSTOM_CSS = """
@@ -445,6 +461,7 @@ def build_app() -> gr.Blocks:
 
             feedback_display = gr.HTML(hidden_feedback(), elem_id="feedback-display")
             speech_output = gr.Audio(label="Read-Along voice", autoplay=True, visible=False)
+            word_help_output = gr.Audio(label="Word helper voice", autoplay=True, visible="hidden")
 
             with gr.Row():
                 next_button = gr.Button("Next Word ➜", elem_classes="control-button", elem_id="next-word-button", variant="secondary")
@@ -477,9 +494,9 @@ def build_app() -> gr.Blocks:
         )
 
         word_click_submit.click(
-            fn=listen_to_word,
+            fn=update_audio_help,
             inputs=[word_click_target, inference_engine],
-            outputs=speech_output,
+            outputs=word_help_output,
             show_progress="hidden",
         )
 
