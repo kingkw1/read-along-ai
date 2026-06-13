@@ -527,7 +527,7 @@ def _call_with_engine(function, *args, inference_engine: str):
     return function(*args)
 
 
-def evaluate_reading(audio_filepath: str, current_index: int, inference_engine: str = TURBO_ENGINE) -> tuple[str, Optional[str]]:
+def evaluate_reading(audio_filepath: str, current_index: int, inference_engine: str = TURBO_ENGINE) -> tuple[str, Optional[str], str]:
     """Evaluate one read attempt against the active curriculum sentence."""
     transcript = _call_with_engine(transcribe_audio, audio_filepath, inference_engine=inference_engine)
     target_sentence = CURRICULUM[int(current_index) % len(CURRICULUM)]
@@ -537,13 +537,13 @@ def evaluate_reading(audio_filepath: str, current_index: int, inference_engine: 
     )
 
     if transcript == "[ASR_ERROR]":
-        return retry_feedback(), None
+        return retry_feedback(), None, ""
 
     exact_match = normalize_text(transcript) == normalize_text(target_sentence)
     if exact_match or _call_with_engine(ask_minicpm_judge, target_sentence, transcript, inference_engine=inference_engine):
-        return success_feedback(), None
+        return success_feedback(), None, "SUCCESS"
 
-    return retry_feedback(), None
+    return retry_feedback(), None, ""
 
 
 def prewarm_current_level(current_index: int, inference_engine: str = TURBO_ENGINE) -> tuple[str, str]:
@@ -551,12 +551,12 @@ def prewarm_current_level(current_index: int, inference_engine: str = TURBO_ENGI
     return start_word_voice_prewarm(sentence)
 
 
-def next_sentence(idx: int, inference_engine: str = TURBO_ENGINE) -> tuple[int, str, None, str, None, None, str, str]:
+def next_sentence(idx: int, inference_engine: str = TURBO_ENGINE) -> tuple[int, str, None, str, None, None, str, str, str]:
     """Advance to the next curriculum sentence and clear transient outputs."""
     next_index = (int(idx) + 1) % len(CURRICULUM)
     next_level_sentence = CURRICULUM[next_index]
     tts_status, ready_words = start_word_voice_prewarm(next_level_sentence)
-    return next_index, render_reading_canvas(next_level_sentence), None, hidden_feedback(), None, None, tts_status, ready_words
+    return next_index, render_reading_canvas(next_level_sentence), None, hidden_feedback(), None, None, tts_status, ready_words, ""
 
 
 def listen_to_sentence(current_index: int, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
@@ -608,7 +608,7 @@ CUSTOM_CSS = """
   --readalong-green: #58c98f;
 }
 
-footer, .api-docs, .built-with, .show-api, .gradio-container > .footer {
+footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-link-row, .gradio-container > .footer, a[href*="gradio.app"], a[href*="/api"], a[href*="?view=api"] {
   display: none !important;
 }
 
@@ -770,6 +770,9 @@ footer, .api-docs, .built-with, .show-api, .gradio-container > .footer {
 """
 
 
+CONFETTI_SCRIPT = "<script src='https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js'></script>"
+
+
 FRONTEND_JS = """
 <script>
   window.readAlongCleanWord = function(word) {
@@ -852,7 +855,7 @@ FRONTEND_JS = """
 
 
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="Read-Along AI") as demo:
+    with gr.Blocks(title="Read-Along AI", css=CUSTOM_CSS, head=CONFETTI_SCRIPT + FRONTEND_JS) as demo:
         current_index = gr.State(0)
         prewarm_timer = gr.Timer(1)
 
@@ -894,6 +897,7 @@ def build_app() -> gr.Blocks:
                 listen_button = gr.Button("🔊 Listen to Sentence", elem_classes="control-button", variant="primary")
 
             tts_ready_audio = gr.Textbox(value="{}", visible="hidden", elem_id="tts-ready-audio")
+            success_trigger = gr.Textbox(value="", visible=False, elem_id="success-trigger")
 
         microphone.change(
             fn=loading_feedback,
@@ -903,7 +907,7 @@ def build_app() -> gr.Blocks:
         ).then(
             fn=evaluate_reading,
             inputs=[microphone, current_index, inference_engine],
-            outputs=[feedback_display, speech_output],
+            outputs=[feedback_display, speech_output, success_trigger],
         )
 
         next_button.click(
@@ -918,7 +922,19 @@ def build_app() -> gr.Blocks:
                 word_help_output,
                 tts_status_display,
                 tts_ready_audio,
+                success_trigger,
             ],
+        )
+
+        success_trigger.change(
+            fn=None,
+            inputs=[success_trigger],
+            outputs=None,
+            js="""(val) => {
+                if (val === 'SUCCESS' && typeof confetti === 'function') {
+                    confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 } });
+                }
+            }""",
         )
 
         listen_button.click(
@@ -944,4 +960,4 @@ def build_app() -> gr.Blocks:
 
 
 if __name__ == "__main__":
-    build_app().launch(css=CUSTOM_CSS, head=FRONTEND_JS)
+    build_app().launch(css=CUSTOM_CSS, head=CONFETTI_SCRIPT + FRONTEND_JS, footer_links=[])
