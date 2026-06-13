@@ -241,7 +241,11 @@ def test_prewarm_level_words_generates_sentence_once_and_caches_word_clips(monke
     app.prewarm_level_words("The cat sat. The cat!", app.LOCAL_ENGINE)
 
     assert calls == [("The cat sat. The cat!", app.LOCAL_ENGINE)]
-    assert set(app.TTS_MEMORY_CACHE) == {"the", "cat", "sat"}
+    assert set(app.TTS_MEMORY_CACHE) == {
+        app.tts_cache_key("The cat sat. The cat!", "the"),
+        app.tts_cache_key("The cat sat. The cat!", "cat"),
+        app.tts_cache_key("The cat sat. The cat!", "sat"),
+    }
     assert all(audio_bytes.startswith(b"RIFF") for audio_bytes in app.TTS_MEMORY_CACHE.values())
     assert app.TTS_PREWARM_STATUS["ready_words"] == ["the", "cat", "sat"]
     assert app.TTS_PREWARM_STATUS["ready"] == 3
@@ -249,6 +253,36 @@ def test_prewarm_level_words_generates_sentence_once_and_caches_word_clips(monke
     assert app.TTS_PREWARM_STATUS["running"] is False
     assert app.TTS_PREWARM_STATUS["clip_method"] == "alignment"
     assert app.TTS_PREWARM_STATUS["fallback_reason"] == ""
+
+
+def test_prewarm_level_words_does_not_reuse_word_clips_from_previous_sentence(monkeypatch) -> None:
+    calls: list[tuple[str, str]] = []
+    old_key = app.tts_cache_key("The cat sat.", "the")
+    new_key = app.tts_cache_key("The dog ran fast.", "the")
+    app.TTS_MEMORY_CACHE[old_key] = b"old-the-from-cat"
+
+    def fake_synthesize_bytes(sentence: str, engine: str) -> bytes:
+        calls.append((sentence, engine))
+        return silent_wav_bytes(seconds=1.4)
+
+    monkeypatch.setattr(app, "synthesize_speech_bytes", fake_synthesize_bytes)
+    monkeypatch.setattr(
+        app,
+        "align_sentence_audio_words",
+        lambda _sentence, _audio_bytes: {
+            "the": (0.0, 0.2),
+            "dog": (0.3, 0.55),
+            "ran": (0.65, 0.9),
+            "fast": (1.0, 1.3),
+        },
+    )
+
+    app.prewarm_level_words("The dog ran fast.", app.LOCAL_ENGINE)
+
+    assert calls == [("The dog ran fast.", app.LOCAL_ENGINE)]
+    assert old_key not in app.TTS_MEMORY_CACHE
+    assert new_key in app.TTS_MEMORY_CACHE
+    assert app.TTS_MEMORY_CACHE[new_key] != b"old-the-from-cat"
 
 
 def test_current_tts_status_reports_proportional_fallback_method() -> None:
@@ -273,7 +307,8 @@ def test_current_tts_status_reports_proportional_fallback_method() -> None:
 
 
 def test_update_audio_help_returns_cached_bytes_without_generating(monkeypatch) -> None:
-    app.TTS_MEMORY_CACHE["cat"] = b"cached-cat"
+    app.TTS_MEMORY_CACHE[app.tts_cache_key("The cat sat.", "cat")] = b"cached-cat"
+    app.TTS_PREWARM_STATUS["sentence"] = "The cat sat."
     monkeypatch.setattr(
         app,
         "synthesize_speech_bytes",
@@ -294,8 +329,18 @@ def test_update_audio_help_does_not_generate_on_cache_miss(monkeypatch) -> None:
     assert app.TTS_MEMORY_CACHE == {}
 
 
+def test_update_audio_help_does_not_reuse_same_word_from_previous_sentence() -> None:
+    app.TTS_MEMORY_CACHE[app.tts_cache_key("The cat sat.", "the")] = b"old-the-from-cat"
+    app.TTS_MEMORY_CACHE[app.tts_cache_key("The dog ran fast.", "the")] = b"new-the-from-dog"
+    app.TTS_PREWARM_STATUS["sentence"] = "The dog ran fast."
+
+    assert app.update_audio_help("The", app.LOCAL_ENGINE) == b"new-the-from-dog"
+    assert app.update_audio_help("The", app.LOCAL_ENGINE, "The cat sat.") == b"old-the-from-cat"
+
+
 def test_finish_word_click_returns_playable_wav_path_from_cached_bytes() -> None:
-    app.TTS_MEMORY_CACHE["cat"] = b"cached-cat-audio"
+    app.TTS_MEMORY_CACHE[app.tts_cache_key("The cat sat.", "cat")] = b"cached-cat-audio"
+    app.TTS_PREWARM_STATUS["sentence"] = "The cat sat."
 
     audio_path, button_update = app.finish_word_click("Cat!", app.TURBO_ENGINE)
 
@@ -306,8 +351,8 @@ def test_finish_word_click_returns_playable_wav_path_from_cached_bytes() -> None
 
 
 def test_current_tts_status_reports_ready_words() -> None:
-    app.TTS_MEMORY_CACHE["the"] = b"wav-the"
-    app.TTS_MEMORY_CACHE["cat"] = b"wav-cat"
+    app.TTS_MEMORY_CACHE[app.tts_cache_key("The cat sat.", "the")] = b"wav-the"
+    app.TTS_MEMORY_CACHE[app.tts_cache_key("The cat sat.", "cat")] = b"wav-cat"
     app.TTS_PREWARM_STATUS.update(
         {
             "sentence": "The cat sat.",

@@ -1,0 +1,51 @@
+[
+  {
+    "index": 0,
+    "sentence": "The cat sat.",
+    "wav": "data/curriculum_audio/01_thecatsat.wav",
+    "words": [
+      "the",
+      "cat",
+      "sat"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 1,
+    "sentence": "The dog ran fast.",
+    "wav": "data/curriculum_audio/02_thedogranfast.wav",
+    "words": [
+      "the",
+      "dog",
+      "ran",
+      "fast"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 2,
+    "sentence": "She had a red hat.",
+    "wav": "data/curriculum_audio/03_shehadaredhat.wav",
+    "words": [
+      "she",
+      "had",
+      "a",
+      "red",
+      "hat"
+    ],
+    "manual_timestamps": {}
+  },
+  {
+    "index": 3,
+    "sentence": "I love to play outside.",
+    "wav": "data/curriculum_audio/04_ilovetoplayoutside.wav",
+    "words": [
+      "i",
+      "love",
+      "to",
+      "play",
+      "outside"
+    ],
+    "manual_timestamps": {}
+  }
+]

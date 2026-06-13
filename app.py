@@ -34,7 +34,7 @@ LOCAL_ENGINE = "🏕️ Off the Grid Mode (Local)"
 INFERENCE_ENGINES = [TURBO_ENGINE, LOCAL_ENGINE]
 
 CURRICULUM = ["The cat sat.", "The dog ran fast.", "She had a red hat.", "I love to play outside."]
-TTS_MEMORY_CACHE: dict[str, bytes] = {}
+TTS_MEMORY_CACHE: dict[tuple[str, str], bytes] = {}
 TTS_PREWARM_STATUS: dict[str, object] = {
     "sentence": "",
     "total": 0,
@@ -162,6 +162,10 @@ def sentence_tts_words(sentence: str) -> list[str]:
             words.append(word)
             seen.add(word)
     return words
+
+
+def tts_cache_key(sentence: str, word: str) -> tuple[str, str]:
+    return normalize_text(sentence), clean_tts_word(word)
 
 
 def wav_duration_seconds(audio_bytes: bytes) -> float:
@@ -327,7 +331,9 @@ def slice_sentence_audio_by_words(sentence: str, audio_bytes: bytes) -> dict[str
 
 def _initialize_prewarm_status(sentence: str, words: list[str]) -> None:
     with TTS_CACHE_LOCK:
-        ready_words = [word for word in words if word in TTS_MEMORY_CACHE]
+        TTS_MEMORY_CACHE.clear()
+        sentence_key = normalize_text(sentence)
+        ready_words = [word for word in words if (sentence_key, word) in TTS_MEMORY_CACHE]
         TTS_PREWARM_STATUS.update(
             {
                 "sentence": sentence,
@@ -348,7 +354,8 @@ def prewarm_level_words(sentence: str, engine_mode: str) -> None:
     _initialize_prewarm_status(sentence, words)
 
     with TTS_CACHE_LOCK:
-        missing_words = [word for word in words if word not in TTS_MEMORY_CACHE]
+        sentence_key = normalize_text(sentence)
+        missing_words = [word for word in words if (sentence_key, word) not in TTS_MEMORY_CACHE]
     if not missing_words:
         with TTS_CACHE_LOCK:
             if TTS_PREWARM_STATUS.get("sentence") == sentence:
@@ -380,8 +387,8 @@ def prewarm_level_words(sentence: str, engine_mode: str) -> None:
                     TTS_PREWARM_STATUS["failed"] = int(TTS_PREWARM_STATUS.get("failed", 0)) + 1
             continue
         with TTS_CACHE_LOCK:
-            TTS_MEMORY_CACHE.setdefault(word, audio_bytes)
             if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                TTS_MEMORY_CACHE.setdefault(tts_cache_key(sentence, word), audio_bytes)
                 ready_words = list(TTS_PREWARM_STATUS.get("ready_words", []))
                 if word not in ready_words:
                     ready_words.append(word)
@@ -408,10 +415,11 @@ def start_word_voice_prewarm(sentence: str) -> tuple[str, str]:
 def current_tts_status() -> tuple[str, str]:
     with TTS_CACHE_LOCK:
         status = dict(TTS_PREWARM_STATUS)
+        sentence = str(status.get("sentence", ""))
         ready_audio = {
-            word: f"data:audio/wav;base64,{base64.b64encode(TTS_MEMORY_CACHE[word]).decode('ascii')}"
+            word: f"data:audio/wav;base64,{base64.b64encode(TTS_MEMORY_CACHE[tts_cache_key(sentence, word)]).decode('ascii')}"
             for word in status.get("ready_words", [])
-            if word in TTS_MEMORY_CACHE
+            if tts_cache_key(sentence, word) in TTS_MEMORY_CACHE
         }
 
     return render_tts_status(status), json.dumps(ready_audio)
@@ -559,7 +567,9 @@ def listen_to_sentence(current_index: int, inference_engine: str = TURBO_ENGINE)
     return synthesize_speech(CURRICULUM[int(current_index) % len(CURRICULUM)], inference_engine)
 
 
-def update_audio_help(clicked_word: str, inference_engine: str = TURBO_ENGINE) -> Optional[bytes]:
+def update_audio_help(
+    clicked_word: str, inference_engine: str = TURBO_ENGINE, sentence: Optional[str] = None
+) -> Optional[bytes]:
     """Return cached realistic word audio if pre-generation has finished.
 
     Word clicks must not block on local VoxCPM generation. If the audio is not
@@ -570,23 +580,26 @@ def update_audio_help(clicked_word: str, inference_engine: str = TURBO_ENGINE) -
         return None
 
     with TTS_CACHE_LOCK:
-        cached_audio = TTS_MEMORY_CACHE.get(word)
+        active_sentence = sentence if sentence is not None else str(TTS_PREWARM_STATUS.get("sentence", ""))
+        cached_audio = TTS_MEMORY_CACHE.get(tts_cache_key(active_sentence, word))
     if cached_audio is not None:
         return cached_audio
 
     return None
 
 
-def finish_word_click(clicked_word: str, inference_engine: str = TURBO_ENGINE) -> tuple[Optional[str], gr.update]:
+def finish_word_click(
+    clicked_word: str, inference_engine: str = TURBO_ENGINE, sentence: Optional[str] = None
+) -> tuple[Optional[str], gr.update]:
     word = clean_tts_word(clicked_word or "")
-    audio_bytes = update_audio_help(word, inference_engine)
+    audio_bytes = update_audio_help(word, inference_engine, sentence)
     audio_path = write_tts_audio_file(word, audio_bytes) if audio_bytes is not None else None
     return audio_path, gr.update(value=word or "Word helper")
 
 
-def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE) -> Optional[bytes]:
+def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE, sentence: Optional[str] = None) -> Optional[bytes]:
     """Backward-compatible alias for word-level audio help."""
-    return update_audio_help(word, inference_engine)
+    return update_audio_help(word, inference_engine, sentence)
 
 
 CUSTOM_CSS = """
