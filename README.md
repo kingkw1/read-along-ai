@@ -90,6 +90,18 @@ If the Q4 GGUF is not already published in the model repo, upload it once with:
 ./scripts/upload_gguf_to_hub.sh
 ```
 
+For quick Hugging Face UI/CSS iteration without rebuilding the local inference stack, deploy the lightweight UI profile:
+
+```bash
+COMMIT_MESSAGE="UI polish" ./scripts/deploy_space.sh --target ui --yes
+```
+
+Use the default local profile for final Off the Grid verification:
+
+```bash
+COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh --target main --yes
+```
+
 ### Badges Claimed (Bonus Quest Champion Strategy)
 * 🏅 **Off-Brand:** The default Gradio UI has been completely overhauled with custom CSS to create a distraction-free, gamified experience for early learners.
 * 🏅 **Well-Tuned:** [`kingkw1/minicpm-phonetic-evaluator`](https://huggingface.co/kingkw1/minicpm-phonetic-evaluator)
