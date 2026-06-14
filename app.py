@@ -547,6 +547,34 @@ def current_tts_status() -> tuple[str, str]:
     return render_tts_status(status), json.dumps(ready_audio)
 
 
+def ensure_current_level_prewarm(
+    current_index: int, inference_engine: str = TURBO_ENGINE, prewarm_started: bool = False
+) -> tuple[bool, str, str]:
+    """Start word voice prewarm once after the UI has had a chance to render."""
+    if prewarm_started:
+        tts_status, ready_words = current_tts_status()
+        return True, tts_status, ready_words
+
+    sentence = CURRICULUM[int(current_index) % len(CURRICULUM)]
+    tts_status, ready_words = start_word_voice_prewarm(sentence)
+    return True, tts_status, ready_words
+
+
+def select_inference_engine(engine_mode: str, current_index: int) -> tuple[str, str, str]:
+    """Update the active inference engine without doing heavy work during the click."""
+    del current_index
+    tts_status, ready_words = current_tts_status()
+    return engine_mode, tts_status, ready_words
+
+
+def select_turbo_engine(current_index: int) -> tuple[str, str, str]:
+    return select_inference_engine(TURBO_ENGINE, current_index)
+
+
+def select_local_engine(current_index: int) -> tuple[str, str, str]:
+    return select_inference_engine(LOCAL_ENGINE, current_index)
+
+
 def render_tts_status(status: dict[str, object]) -> str:
     total = int(status.get("total", 0))
     if total == 0:
@@ -559,19 +587,33 @@ def render_tts_status(status: dict[str, object]) -> str:
     fallback_reason = html.escape(str(status.get("fallback_reason", "")), quote=True)
     method_label = ""
     if clip_method == "alignment":
-        method_label = " (aligned)"
+        method_label = "fast word help"
     elif clip_method == "proportional_fallback":
-        method_label = " (proportional fallback)"
+        method_label = "slower word help"
+    elif clip_method == "signal_alignment":
+        method_label = "fast word help"
 
     if ready >= total:
         title = f' title="{fallback_reason}"' if fallback_reason else ""
-        return f'<div class="voice-status voice-status-ready"{title}>Word voices ready{method_label}</div>'
+        return (
+            f'<div class="voice-status voice-status-ready"{title}>'
+            f'<span class="voice-status-legacy">Word voices ready{" (proportional fallback)" if clip_method == "proportional_fallback" else ""}</span>'
+            f'✨ {method_label or "word help ready"}</div>'
+        )
     if running:
-        return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}{method_label}</div>'
+        return (
+            f'<div class="voice-status voice-status-loading">'
+            f'<span class="voice-status-legacy">Getting word voices ready... {ready}/{total}</span>'
+            f'✨ preparing word help {ready}/{total}</div>'
+        )
     if failed:
         title = f' title="{fallback_reason}"' if fallback_reason else ""
-        return f'<div class="voice-status voice-status-loading"{title}>Some word voices need browser backup... {ready}/{total}{method_label}</div>'
-    return f'<div class="voice-status voice-status-loading">Getting word voices ready... {ready}/{total}{method_label}</div>'
+        return f'<div class="voice-status voice-status-loading"{title}>✨ browser word help ready</div>'
+    return (
+        f'<div class="voice-status voice-status-loading">'
+        f'<span class="voice-status-legacy">Getting word voices ready... {ready}/{total}</span>'
+        f'✨ preparing word help {ready}/{total}</div>'
+    )
 
 
 def ask_minicpm_judge(target_text: str, transcript: str, inference_engine: str = TURBO_ENGINE) -> bool:
@@ -729,9 +771,13 @@ CUSTOM_CSS = """
   --readalong-cream: #fff7df;
   --readalong-blue: #dff3ff;
   --readalong-navy: #12355b;
+  --readalong-ink: #244a70;
   --readalong-coral: #ff7a70;
+  --readalong-orange: #ff8c4f;
   --readalong-yellow: #ffe873;
   --readalong-green: #58c98f;
+  --readalong-mint: #d9ffe9;
+  --readalong-paper: rgba(255, 255, 255, 0.86);
 }
 
 footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-link-row, .gradio-container > .footer, a[href*="gradio.app"], a[href*="/api"], a[href*="?view=api"] {
@@ -750,9 +796,10 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 .main-container {
   max-width: 980px;
   margin: 0 auto !important;
-  min-height: 100vh;
-  padding: 2rem 1.25rem 3rem !important;
-  gap: 1.4rem !important;
+  min-height: 0 !important;
+  padding: 1.35rem 1.25rem 2rem !important;
+  gap: 0.55rem !important;
+  justify-content: flex-start !important;
 }
 
 .app-title {
@@ -765,39 +812,154 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
   text-shadow: 0 4px 0 rgba(255, 255, 255, 0.9);
 }
 
+.hero-panel {
+  background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.52));
+  border: 4px solid rgba(18, 53, 91, 0.1);
+  border-radius: 38px;
+  box-shadow: 0 22px 55px rgba(18, 53, 91, 0.13);
+  flex: 0 0 auto !important;
+  gap: 0.55rem !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: clamp(0.65rem, 1.6vw, 0.9rem) !important;
+}
+
+.hero-panel > * {
+  flex-grow: 0 !important;
+}
+
+.hero-panel .block,
+.hero-panel .form,
+.hero-panel .prose,
+.hero-panel [data-testid='HTML'] {
+  margin-bottom: 0 !important;
+  min-height: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.top-toolbar {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.engine-panel {
+  background: #f8fbff !important;
+  border: 2px solid rgba(18, 53, 91, 0.12) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  color: #12355b !important;
+  margin: 0 !important;
+  padding: 0.35rem 0.55rem !important;
+  -webkit-text-fill-color: #12355b !important;
+}
+
+.engine-title {
+  color: #12355b !important;
+  font-size: 0.78rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.04em;
+  margin: 0 0.35rem 0.25rem 0 !important;
+  opacity: 1 !important;
+  text-transform: uppercase;
+  -webkit-text-fill-color: #12355b !important;
+}
+
+.engine-buttons {
+  gap: 0.55rem !important;
+}
+
+.engine-choice,
+.engine-choice button,
+button.engine-choice,
+.engine-choice > button,
+.engine-choice .wrap,
+.engine-choice .wrap button {
+  background: #fff7cf !important;
+  border: 2px solid rgba(18, 53, 91, 0.18) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 3px 0 rgba(18, 53, 91, 0.12) !important;
+  color: #12355b !important;
+  font-size: 0.95rem !important;
+  font-weight: 900 !important;
+  min-height: 38px !important;
+  opacity: 1 !important;
+  padding: 0.35rem 0.75rem !important;
+  -webkit-text-fill-color: #12355b !important;
+}
+
+.engine-choice *,
+button.engine-choice * {
+  color: inherit !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.engine-choice-turbo,
+.engine-choice-turbo button,
+button.engine-choice-turbo,
+.engine-choice-turbo > button,
+.engine-choice-turbo .wrap,
+.engine-choice-turbo .wrap button {
+  background: #d9ffe9 !important;
+  border-color: var(--readalong-green) !important;
+  color: #145c38 !important;
+  -webkit-text-fill-color: #145c38 !important;
+}
+
+#inference-engine-state {
+  display: none !important;
+}
+
 .reading-card {
-  background: rgba(255, 255, 255, 0.78);
-  border: 6px solid rgba(18, 53, 91, 0.14);
-  border-radius: 42px;
-  box-shadow: 0 20px 50px rgba(18, 53, 91, 0.16);
-  padding: clamp(1.5rem, 4vw, 3rem);
+  background: var(--readalong-paper);
+  border: 5px solid rgba(18, 53, 91, 0.12);
+  border-radius: 34px;
+  box-shadow: inset 0 -8px 0 rgba(18, 53, 91, 0.04);
+  margin: 0 !important;
+  padding: clamp(0.8rem, 2vw, 1.25rem) clamp(1rem, 2.5vw, 1.75rem);
   text-align: center;
 }
 
 .reading-helper {
   font-size: clamp(1.2rem, 3vw, 1.8rem);
   font-weight: 800;
-  margin-bottom: 1rem;
+  margin-bottom: 0.45rem;
   color: #38618c;
 }
 
 .reading-sentence {
   align-items: center;
+  color: #111827 !important;
   display: flex;
   flex-wrap: wrap;
-  font-size: clamp(4rem, 11vw, 6rem);
+  font-size: clamp(3.25rem, 9vw, 5.4rem);
   font-weight: 900;
   gap: 0.18em;
   justify-content: center;
-  line-height: 1.15;
+  line-height: 1.02;
+  margin: 0 auto !important;
 }
 
 .clickable-word {
   border-radius: 0.35em;
+  color: #111827 !important;
   cursor: pointer;
   display: inline-block;
+  opacity: 1 !important;
   padding: 0.02em 0.12em;
   transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  -webkit-text-fill-color: #111827 !important;
+}
+
+.reading-card .reading-sentence,
+.reading-card .reading-sentence *,
+.prose .reading-sentence,
+.prose .reading-sentence * {
+  color: #111827 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #111827 !important;
 }
 
 .clickable-word:hover, .clickable-word:focus {
@@ -808,15 +970,43 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 }
 
 .interaction-zone {
-  background: rgba(255,255,255,0.45);
-  border-radius: 36px;
-  padding: 1rem;
+  background: rgba(255,255,255,0.54);
+  border: 4px solid rgba(18, 53, 91, 0.08);
+  border-radius: 32px;
+  flex: 0 0 auto !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+  min-height: 0 !important;
+  padding: 0.55rem 0.7rem 0.35rem;
+  position: relative;
+}
+
+.interaction-zone > * {
+  flex-grow: 0 !important;
+}
+
+.interaction-zone .block,
+.interaction-zone .form,
+.interaction-zone [data-testid='audio'],
+.interaction-zone [data-testid='Audio'] {
+  margin-bottom: 0 !important;
+  min-height: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 #mic-capture {
   border: none !important;
   box-shadow: none !important;
+  height: auto !important;
   margin: 0 !important;
+  min-height: 92px !important;
+}
+
+#mic-capture > div,
+#mic-capture .wrap {
+  height: auto !important;
+  margin-bottom: 0 !important;
+  min-height: 92px !important;
 }
 
 #mic-capture .waveform,
@@ -824,24 +1014,65 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 #mic-capture audio,
 #mic-capture button[aria-label*='Edit'],
 #mic-capture button[aria-label*='Trim'],
-#mic-capture button[aria-label*='Download'] {
+#mic-capture button[aria-label*='Download'],
+#mic-capture button[aria-label*='Share'],
+#mic-capture button[aria-label*='Forward'],
+#mic-capture button[aria-label*='Skip'],
+#mic-capture button[aria-label*='Rewind'],
+#mic-capture button[aria-label*='Back'],
+#mic-capture button[aria-label*='Restart'],
+#mic-capture button[aria-label*='Replay'],
+#mic-capture button[aria-label*='Speed'],
+#mic-capture button[aria-label*='Playback speed'],
+#mic-capture button[title*='Forward'],
+#mic-capture button[title*='Skip'],
+#mic-capture button[title*='Rewind'],
+#mic-capture button[title*='Back'],
+#mic-capture button[title*='Restart'],
+#mic-capture button[title*='Replay'],
+#mic-capture button[title*='Speed'],
+#mic-capture button[title*='Playback speed'],
+#mic-capture [aria-label*='microphone' i],
+#mic-capture [aria-label*='input device' i],
+#mic-capture [title*='microphone' i],
+#mic-capture [title*='headset' i],
+#mic-capture [title*='input device' i],
+#mic-capture [class*='warning' i],
+#mic-capture [class*='error' i],
+#mic-capture [data-testid*='toast' i] {
+  display: none !important;
+}
+
+#mic-capture select,
+#mic-capture option,
+#mic-capture [role='combobox'],
+#mic-capture [class*='device' i],
+#mic-capture [class*='source' i] {
   display: none !important;
 }
 
 #mic-capture button,
 #mic-capture .record-button {
-  background: linear-gradient(135deg, var(--readalong-coral), #ffb067) !important;
-  border: 7px solid white !important;
+  background: linear-gradient(135deg, var(--readalong-coral), var(--readalong-orange)) !important;
+  border: 6px solid white !important;
   border-radius: 999px !important;
-  box-shadow: 0 14px 0 #c84d4b, 0 24px 40px rgba(18, 53, 91, 0.24) !important;
+  box-shadow: 0 9px 0 #c84d4b, 0 16px 28px rgba(18, 53, 91, 0.22) !important;
   color: white !important;
-  font-size: clamp(1.7rem, 5vw, 3rem) !important;
+  font-size: clamp(1.1rem, 3vw, 2.25rem) !important;
   font-weight: 900 !important;
-  min-height: 96px !important;
+  min-height: 62px !important;
+  min-width: 62px !important;
+  padding: 0.35rem 0.9rem !important;
+  transition: transform 140ms ease, filter 140ms ease !important;
+}
+
+#mic-capture button:hover {
+  filter: brightness(1.05) !important;
+  transform: translateY(-2px) !important;
 }
 
 #mic-capture label span {
-  font-size: clamp(1.5rem, 4vw, 2.4rem) !important;
+  font-size: 0.82rem !important;
   font-weight: 900 !important;
 }
 
@@ -863,18 +1094,20 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 
 .feedback-card {
   border-radius: 34px;
-  min-height: 122px;
-  padding: 1.2rem;
+  color: var(--readalong-navy);
+  min-height: 96px;
+  padding: 0.95rem;
   text-align: center;
 }
 
 .feedback-hidden { display: none; }
 .feedback-loading { background: #fff5c7; font-size: 1.8rem; font-weight: 900; }
-.feedback-success { background: #d9ffe9; border: 5px solid var(--readalong-green); }
-.feedback-retry { background: #ffe4df; border: 5px solid var(--readalong-coral); }
-.feedback-title { font-size: clamp(2rem, 5vw, 3rem); font-weight: 900; }
-.feedback-subtitle { font-size: clamp(1.2rem, 3vw, 1.7rem); font-weight: 800; }
-.star-row { font-size: clamp(2.2rem, 6vw, 4rem); }
+.feedback-success { background: var(--readalong-mint); border: 5px solid var(--readalong-green); color: #145c38; }
+.feedback-retry { background: #ffe4df; border: 5px solid var(--readalong-coral); color: #7a1f18; }
+.feedback-title { font-size: clamp(1.65rem, 4vw, 2.45rem); font-weight: 900; }
+.feedback-subtitle { font-size: clamp(1rem, 2.4vw, 1.35rem); font-weight: 800; }
+.feedback-card * { color: inherit !important; }
+.star-row { font-size: clamp(1.8rem, 4.5vw, 3rem); line-height: 1; }
 .star-row span, .spinner-star { display: inline-block; animation: bounce-star 780ms infinite alternate ease-in-out; }
 .star-row span:nth-child(2) { animation-delay: 120ms; }
 .star-row span:nth-child(3) { animation-delay: 240ms; }
@@ -882,24 +1115,62 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 
 .voice-status {
   border-radius: 999px;
-  font-size: clamp(1rem, 2.4vw, 1.35rem);
+  font-size: 0.88rem;
   font-weight: 900;
-  margin: -0.35rem auto 0.15rem;
-  max-width: 520px;
-  padding: 0.65rem 1rem;
+  margin: 0;
+  max-width: 240px;
+  padding: 0.45rem 0.75rem;
   text-align: center;
+  white-space: nowrap;
 }
 
 .voice-status-hidden { display: none; }
+.voice-status-legacy {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
 .voice-status-loading { background: #fff5c7; color: #725300; }
 .voice-status-ready { background: #d9ffe9; color: #145c38; }
 
 .control-button button {
   border-radius: 999px !important;
-  font-size: clamp(1.3rem, 3vw, 2rem) !important;
+  font-size: clamp(1rem, 2.25vw, 1.35rem) !important;
   font-weight: 900 !important;
-  min-height: 76px !important;
+  min-height: 56px !important;
   box-shadow: 0 10px 0 rgba(18, 53, 91, 0.18) !important;
+}
+
+.action-row {
+  gap: 0.75rem !important;
+  margin-bottom: 0.35rem !important;
+}
+
+#feedback-display {
+  margin-top: 0 !important;
+  min-height: 0 !important;
+}
+
+#feedback-display.feedback-wrapper-hidden {
+  display: none !important;
+}
+
+#feedback-display:has(.feedback-hidden) {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .top-toolbar {
+    grid-template-columns: 1fr;
+  }
+  .voice-status {
+    max-width: none;
+    width: 100%;
+  }
 }
 
 @keyframes bounce-star {
@@ -981,7 +1252,11 @@ FRONTEND_JS = """
       if (!feedback || feedback.dataset.readAlongObserved === 'true') return;
       feedback.dataset.readAlongObserved = 'true';
       let timer = null;
+      const syncFeedbackLayout = () => {
+        feedback.classList.toggle('feedback-wrapper-hidden', Boolean(feedback.querySelector('.feedback-hidden')));
+      };
       const observer = new MutationObserver(() => {
+        syncFeedbackLayout();
         if (feedback.querySelector('.feedback-success')) {
           window.clearTimeout(timer);
           timer = window.setTimeout(() => {
@@ -990,6 +1265,7 @@ FRONTEND_JS = """
         }
       });
       observer.observe(feedback, { childList: true, subtree: true });
+      syncFeedbackLayout();
     };
     armSuccessAdvance();
     window.setTimeout(armSuccessAdvance, 1000);
@@ -1001,20 +1277,45 @@ FRONTEND_JS = """
 def build_app() -> gr.Blocks:
     with gr.Blocks(title="Read-Along AI") as demo:
         current_index = gr.State(0)
+        prewarm_started = gr.State(False)
         prewarm_timer = gr.Timer(1)
 
-        gr.HTML('<h1 class="app-title">Read-Along AI</h1>')
         with gr.Column(elem_classes="main-container"):
-            inference_engine = gr.Radio(
-                choices=INFERENCE_ENGINES,
-                value=TURBO_ENGINE,
-                label="Inference Engine",
-                elem_classes="engine-toggle",
-            )
-            reading_canvas = gr.HTML(render_reading_canvas(CURRICULUM[0]))
-            tts_status_display = gr.HTML(render_tts_status(dict(TTS_PREWARM_STATUS)), elem_id="tts-status-display")
+            gr.HTML('<h1 class="app-title">Read-Along AI</h1>')
+            with gr.Column(elem_classes="hero-panel"):
+                with gr.Row(elem_classes="top-toolbar"):
+                    with gr.Column(elem_classes="engine-panel"):
+                        gr.HTML('<div class="engine-title">Inference Engine</div>')
+                        with gr.Row(elem_classes="engine-buttons"):
+                            turbo_engine_button = gr.Button(
+                                "⚡ Turbo Mode (Modal)",
+                                elem_classes=["engine-choice", "engine-choice-turbo"],
+                                elem_id="turbo-engine-button",
+                            )
+                            local_engine_button = gr.Button(
+                                "🏕️ Off the Grid Mode (Local)",
+                                elem_classes=["engine-choice", "engine-choice-local"],
+                                elem_id="local-engine-button",
+                            )
+                    inference_engine = gr.Radio(
+                        choices=INFERENCE_ENGINES,
+                        value=TURBO_ENGINE,
+                        label="Inference Engine",
+                        visible=False,
+                        elem_id="inference-engine-state",
+                    )
+                    tts_status_display = gr.HTML(render_tts_status(dict(TTS_PREWARM_STATUS)), elem_id="tts-status-display")
+                reading_canvas = gr.HTML(render_reading_canvas(CURRICULUM[0]))
 
             with gr.Column(elem_classes="interaction-zone"):
+                with gr.Row(elem_classes="action-row"):
+                    next_button = gr.Button(
+                        "Next Level ➡️",
+                        elem_classes="control-button",
+                        elem_id="next-word-button",
+                        variant="secondary",
+                    )
+                    listen_button = gr.Button("🔊 Listen to Sentence", elem_classes="control-button", variant="primary")
                 microphone = gr.Audio(
                     label="🎙️ Press and read out loud",
                     sources=["microphone"],
@@ -1036,10 +1337,6 @@ def build_app() -> gr.Blocks:
                 elem_id="word-help-output",
             )
 
-            with gr.Row():
-                next_button = gr.Button("Next Level ➡️", elem_classes="control-button", elem_id="next-word-button", variant="secondary")
-                listen_button = gr.Button("🔊 Listen to Sentence", elem_classes="control-button", variant="primary")
-
             tts_ready_audio = gr.Textbox(value="{}", visible="hidden", elem_id="tts-ready-audio")
             success_trigger = gr.Textbox(value="", visible=False, elem_id="success-trigger")
 
@@ -1052,6 +1349,20 @@ def build_app() -> gr.Blocks:
             fn=evaluate_reading,
             inputs=[microphone, current_index, inference_engine],
             outputs=[feedback_display, speech_output, success_trigger],
+        )
+
+        turbo_engine_button.click(
+            fn=select_turbo_engine,
+            inputs=current_index,
+            outputs=[inference_engine, tts_status_display, tts_ready_audio],
+            show_progress="hidden",
+        )
+
+        local_engine_button.click(
+            fn=select_local_engine,
+            inputs=current_index,
+            outputs=[inference_engine, tts_status_display, tts_ready_audio],
+            show_progress="hidden",
         )
 
         next_button.click(
@@ -1088,16 +1399,16 @@ def build_app() -> gr.Blocks:
         )
 
         demo.load(
-            fn=prewarm_current_level,
-            inputs=[current_index, inference_engine],
+            fn=current_tts_status,
+            inputs=None,
             outputs=[tts_status_display, tts_ready_audio],
             show_progress="hidden",
         )
 
         prewarm_timer.tick(
-            fn=current_tts_status,
-            inputs=None,
-            outputs=[tts_status_display, tts_ready_audio],
+            fn=ensure_current_level_prewarm,
+            inputs=[current_index, inference_engine, prewarm_started],
+            outputs=[prewarm_started, tts_status_display, tts_ready_audio],
             show_progress="hidden",
         )
     return demo
