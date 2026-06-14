@@ -54,6 +54,32 @@
     window.readAlongSpeakWithBrowser(text);
   };
 
+  window.readAlongBurstConfetti = function() {
+    const existing = document.querySelector('.readalong-confetti-layer');
+    if (existing) existing.remove();
+
+    const layer = document.createElement('div');
+    layer.className = 'readalong-confetti-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    const colors = ['#ff7a70', '#ffcc4d', '#58c98f', '#55b7ff', '#9b8cff'];
+    const shapes = ['★', '●', '■', '▲'];
+
+    for (let index = 0; index < 80; index += 1) {
+      const piece = document.createElement('span');
+      piece.className = 'readalong-confetti-piece';
+      piece.textContent = shapes[index % shapes.length];
+      piece.style.left = `${8 + Math.random() * 84}%`;
+      piece.style.color = colors[index % colors.length];
+      piece.style.animationDelay = `${Math.random() * 220}ms`;
+      piece.style.setProperty('--drift', `${(Math.random() - 0.5) * 220}px`);
+      piece.style.setProperty('--spin', `${180 + Math.random() * 540}deg`);
+      layer.appendChild(piece);
+    }
+
+    document.body.appendChild(layer);
+    window.setTimeout(() => layer.remove(), 1900);
+  };
+
   window.addEventListener('load', () => {
     const armSuccessAdvance = () => {
       const feedback = document.querySelector('#feedback-display');
