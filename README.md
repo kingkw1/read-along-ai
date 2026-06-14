@@ -122,6 +122,14 @@ COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh -
 * 🏅 **Sharing is Caring:** *[Insert Hugging Face Dataset Link to Codex Agent Traces]*
 * 🏅 **Field Notes:** *[Insert Link to Blog Post / Medium Article]*
 
+### Off-Brand UI Evidence
+The Gradio layer is used as the app runtime and event system, while the child-facing surface is custom HTML, CSS, and JavaScript designed for early readers. The intended judging view is a purpose-built reading app: one large sentence, tap-to-hear words, a simple read-aloud control, progress feedback, and celebration animation.
+
+* **Desktop screenshot:** *[Insert screenshot of the live Space showing the custom reading canvas, mascot/progress row, engine toggle, and microphone control]*
+* **Mobile/tablet screenshot:** *[Insert narrow-screen screenshot proving the child-facing UI remains readable and polished on a family device]*
+* **Celebration clip:** *[Insert short GIF/video clip of a successful read triggering the center-burst confetti and auto-advance]*
+* **Default-Gradio contrast note:** *[Optional: Insert one sentence explaining that the child never sees a data-science-style Gradio panel, exposed API controls, or raw model outputs during the learning loop]*
+
 ## 🚀 How It Works
 The hackathon MVP is focused on a stable sentence-reading loop:
 1. **Choose a sentence:** The app displays one short curriculum sentence in large, clickable text.
