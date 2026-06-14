@@ -47,7 +47,7 @@ For a deep dive into the architecture and development plan, please review our sp
 * [Hackathon Roadmap](docs/ROADMAP.md)
 
 ### Components
-* **Frontend:** A custom, gamified Gradio interface ("Off-Brand" UI) built for legibility and young readers.
+* **Frontend:** A custom, gamified Gradio interface ("Off-Brand" UI) built for legibility and young readers, with a custom HTML reading canvas, child-sized controls, local CSS/JS reward effects, and hidden Gradio chrome.
 * **ASR (Speech-to-Text):** **Cohere Transcribe** (2B parameters) in Turbo Mode and `faster-whisper` `tiny.en` in Off the Grid Mode.
 * **Reading Evaluator:** A fine-tuned **MiniCPM phonetic evaluator** (`kingkw1/minicpm-phonetic-evaluator`) judges close or ambiguous ASR transcripts after exact normalized matching.
 * **TTS / Audio Help:** **OpenBMB VoxCPM** (0.5B parameters) powers Modal Turbo Mode and was used to generate local curriculum audio assets. Off the Grid Mode defaults to committed sentence WAVs plus label-sliced word clips for responsive local assistance.
@@ -109,7 +109,11 @@ COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh -
 ```
 
 ### Badges Claimed (Bonus Quest Champion Strategy)
-* 🏅 **Off-Brand:** The default Gradio UI has been completely overhauled with custom CSS to create a distraction-free, gamified experience for early learners.
+* 🏅 **Off-Brand:** The default Gradio UI has been completely overhauled into a child-facing reading app. Evidence:
+  * The reading prompt is rendered through custom `gr.HTML`, not a stock textbox, so each word is a keyboard-accessible clickable span with instant word help.
+  * `assets/read_along.css` hides default Gradio chrome/API links, restyles the global shell, replaces the stock audio recorder surface with a large read-aloud control, and adds a custom mascot/progress treatment.
+  * `assets/read_along.js` owns the word-help playback path and success auto-advance; the celebration uses a center-burst `canvas-confetti` effect with a local DOM/CSS fallback.
+  * The visible workflow is sentence-first and child-sized: no data-science panels, exposed API widgets, or default component labels in the main learning loop.
 * 🏅 **Well-Tuned:** [`kingkw1/minicpm-phonetic-evaluator`](https://huggingface.co/kingkw1/minicpm-phonetic-evaluator)
 * 🏅 **Tiny Titan:** Every individual model used in this pipeline (and their combined footprint) is strictly under the 4B parameter threshold.
   * *Parameter Math:* Cohere Transcribe/faster-whisper (2B / 0.04B) + OpenBMB VoxCPM (0.5B) + MiniCPM Evaluator (2.4B) = ***2.9B Total Parameters***.
@@ -117,6 +121,14 @@ COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh -
 * 🏅 **Llama Champion:** The local phonetic evaluator runs the Q4 GGUF through `llama-cpp-python`.
 * 🏅 **Sharing is Caring:** *[Insert Hugging Face Dataset Link to Codex Agent Traces]*
 * 🏅 **Field Notes:** *[Insert Link to Blog Post / Medium Article]*
+
+### Off-Brand UI Evidence
+The Gradio layer is used as the app runtime and event system, while the child-facing surface is custom HTML, CSS, and JavaScript designed for early readers. The intended judging view is a purpose-built reading app: one large sentence, tap-to-hear words, a simple read-aloud control, progress feedback, and celebration animation.
+
+* **Desktop screenshot:** *[Insert screenshot of the live Space showing the custom reading canvas, mascot/progress row, engine toggle, and microphone control]*
+* **Mobile/tablet screenshot:** *[Insert narrow-screen screenshot proving the child-facing UI remains readable and polished on a family device]*
+* **Celebration clip:** *[Insert short GIF/video clip of a successful read triggering the center-burst confetti and auto-advance]*
+* **Default-Gradio contrast note:** *[Optional: Insert one sentence explaining that the child never sees a data-science-style Gradio panel, exposed API controls, or raw model outputs during the learning loop]*
 
 ## 🚀 How It Works
 The hackathon MVP is focused on a stable sentence-reading loop:

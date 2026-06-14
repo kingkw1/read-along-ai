@@ -760,7 +760,7 @@ def ask_minicpm_judge(target_text: str, transcript: str, inference_engine: str =
     return verdict == "true"
 
 
-def render_reading_canvas(sentence: str) -> str:
+def render_reading_canvas(sentence: str, current_index: Optional[int] = None) -> str:
     """Render target text as clickable HTML spans, not a Gradio textbox."""
     spans: list[str] = []
     for raw_word in sentence.split():
@@ -775,9 +775,26 @@ def render_reading_canvas(sentence: str) -> str:
             f"{escaped_display}</span>"
         )
 
+    index = 0 if current_index is None else int(current_index) % len(CURRICULUM)
+    progress_dots = "".join(
+        '<span class="progress-dot progress-dot-active" aria-current="step"></span>'
+        if dot_index == index
+        else '<span class="progress-dot"></span>'
+        for dot_index in range(len(CURRICULUM))
+    )
     return f"""
     <section class="reading-card" aria-label="Reading sentence">
-        <div class="reading-helper">Tap a word if you need help ✨</div>
+        <div class="reading-stage">
+            <div class="reader-mascot" aria-hidden="true">
+                <span class="reader-mascot-face">🦉</span>
+                <span class="reader-mascot-book">ABC</span>
+            </div>
+            <div class="reading-stage-copy">
+                <div class="reading-kicker">Sentence {index + 1} of {len(CURRICULUM)}</div>
+                <div class="reading-helper">Tap a word if you need help ✨</div>
+            </div>
+            <div class="sentence-progress" aria-label="Sentence progress">{progress_dots}</div>
+        </div>
         <div class="reading-sentence">{' '.join(spans)}</div>
     </section>
     """
@@ -861,7 +878,17 @@ def next_sentence(idx: int, inference_engine: str = TURBO_ENGINE) -> tuple[int, 
     next_index = (int(idx) + 1) % len(CURRICULUM)
     next_level_sentence = CURRICULUM[next_index]
     tts_status, ready_words = start_word_voice_prewarm(next_level_sentence, inference_engine)
-    return next_index, render_reading_canvas(next_level_sentence), None, hidden_feedback(), None, None, tts_status, ready_words, ""
+    return (
+        next_index,
+        render_reading_canvas(next_level_sentence, next_index),
+        None,
+        hidden_feedback(),
+        None,
+        None,
+        tts_status,
+        ready_words,
+        "",
+    )
 
 
 def listen_to_sentence(current_index: int, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
@@ -948,12 +975,12 @@ def build_app() -> gr.Blocks:
                         elem_id="inference-engine-state",
                     )
                     tts_status_display = gr.HTML(render_tts_status(dict(TTS_PREWARM_STATUS)), elem_id="tts-status-display")
-                reading_canvas = gr.HTML(render_reading_canvas(CURRICULUM[0]))
+                reading_canvas = gr.HTML(render_reading_canvas(CURRICULUM[0], 0))
 
             with gr.Column(elem_classes="interaction-zone"):
                 with gr.Row(elem_classes="action-row"):
                     next_button = gr.Button(
-                        "Next Level ➡️",
+                        "Next Sentence ➡️",
                         elem_classes="control-button",
                         elem_id="next-word-button",
                         variant="secondary",
@@ -1029,8 +1056,15 @@ def build_app() -> gr.Blocks:
             inputs=[success_trigger],
             outputs=None,
             js="""(val) => {
-                if (val === 'SUCCESS' && typeof confetti === 'function') {
+                if (val !== 'SUCCESS') {
+                    return;
+                }
+                if (typeof confetti === 'function') {
                     confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 } });
+                    return;
+                }
+                if (typeof window.readAlongBurstConfetti === 'function') {
+                    window.readAlongBurstConfetti();
                 }
             }""",
         )

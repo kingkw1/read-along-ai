@@ -124,6 +124,16 @@ def test_next_sentence_cycles_curriculum_clears_outputs_and_starts_word_prewarm(
     assert prewarm_calls == [("The cat sat.", app.TURBO_ENGINE)]
 
 
+def test_render_reading_canvas_uses_custom_child_facing_markup() -> None:
+    sentence_html = app.render_reading_canvas("The cat sat.", 0)
+
+    assert "reader-mascot" in sentence_html
+    assert "Sentence 1 of 4" in sentence_html
+    assert "progress-dot-active" in sentence_html
+    assert 'class="clickable-word"' in sentence_html
+    assert "readAlongSpeakWord('cat')" in sentence_html
+
+
 def test_prewarm_current_level_uses_selected_engine(monkeypatch) -> None:
     prewarm_calls: list[tuple[str, str]] = []
     monkeypatch.setattr(

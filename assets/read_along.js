@@ -54,6 +54,38 @@
     window.readAlongSpeakWithBrowser(text);
   };
 
+  window.readAlongBurstConfetti = function() {
+    const existing = document.querySelector('.readalong-confetti-layer');
+    if (existing) existing.remove();
+
+    const layer = document.createElement('div');
+    layer.className = 'readalong-confetti-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    const colors = ['#ff7a70', '#ffcc4d', '#58c98f', '#55b7ff', '#9b8cff'];
+    const shapes = ['★', '●', '■', '▲'];
+
+    for (let index = 0; index < 96; index += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 110 + Math.random() * 260;
+      const x = Math.cos(angle) * distance;
+      const y = Math.sin(angle) * distance - 90;
+      const fall = 170 + Math.random() * 220;
+      const piece = document.createElement('span');
+      piece.className = 'readalong-confetti-piece';
+      piece.textContent = shapes[index % shapes.length];
+      piece.style.color = colors[index % colors.length];
+      piece.style.animationDelay = `${Math.random() * 80}ms`;
+      piece.style.setProperty('--burst-x', `${x}px`);
+      piece.style.setProperty('--burst-y', `${y}px`);
+      piece.style.setProperty('--fall-y', `${fall}px`);
+      piece.style.setProperty('--spin', `${180 + Math.random() * 540}deg`);
+      layer.appendChild(piece);
+    }
+
+    document.body.appendChild(layer);
+    window.setTimeout(() => layer.remove(), 1700);
+  };
+
   window.addEventListener('load', () => {
     const armSuccessAdvance = () => {
       const feedback = document.querySelector('#feedback-display');
