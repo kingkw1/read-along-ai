@@ -532,6 +532,20 @@ def current_tts_status() -> tuple[str, str]:
     return render_tts_status(status), json.dumps(ready_audio)
 
 
+def select_inference_engine(engine_mode: str, current_index: int) -> tuple[str, str, str]:
+    """Update the active inference engine and refresh word-help prewarm status."""
+    tts_status, ready_words = prewarm_current_level(current_index, engine_mode)
+    return engine_mode, tts_status, ready_words
+
+
+def select_turbo_engine(current_index: int) -> tuple[str, str, str]:
+    return select_inference_engine(TURBO_ENGINE, current_index)
+
+
+def select_local_engine(current_index: int) -> tuple[str, str, str]:
+    return select_inference_engine(LOCAL_ENGINE, current_index)
+
+
 def render_tts_status(status: dict[str, object]) -> str:
     total = int(status.get("total", 0))
     if total == 0:
@@ -753,9 +767,10 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 .main-container {
   max-width: 980px;
   margin: 0 auto !important;
-  min-height: 100vh;
+  min-height: 0 !important;
   padding: 1.35rem 1.25rem 2rem !important;
-  gap: 0.95rem !important;
+  gap: 0.55rem !important;
+  justify-content: flex-start !important;
 }
 
 .app-title {
@@ -773,8 +788,24 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
   border: 4px solid rgba(18, 53, 91, 0.1);
   border-radius: 38px;
   box-shadow: 0 22px 55px rgba(18, 53, 91, 0.13);
-  padding: clamp(0.75rem, 2vw, 1.15rem) !important;
-  gap: 0.75rem !important;
+  flex: 0 0 auto !important;
+  gap: 0.55rem !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: clamp(0.65rem, 1.6vw, 0.9rem) !important;
+}
+
+.hero-panel > * {
+  flex-grow: 0 !important;
+}
+
+.hero-panel .block,
+.hero-panel .form,
+.hero-panel .prose,
+.hero-panel [data-testid='HTML'] {
+  margin-bottom: 0 !important;
+  min-height: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .top-toolbar {
@@ -784,42 +815,72 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.engine-toggle {
-  background: rgba(255,255,255,0.68) !important;
+.engine-panel {
+  background: #f8fbff !important;
   border: 2px solid rgba(18, 53, 91, 0.12) !important;
   border-radius: 999px !important;
   box-shadow: none !important;
+  color: #12355b !important;
   margin: 0 !important;
   padding: 0.35rem 0.55rem !important;
+  -webkit-text-fill-color: #12355b !important;
 }
 
-.engine-toggle > label,
-.engine-toggle .wrap > label,
-.engine-toggle fieldset > legend {
-  color: var(--readalong-ink) !important;
+.engine-title {
+  color: #12355b !important;
   font-size: 0.78rem !important;
   font-weight: 900 !important;
   letter-spacing: 0.04em;
-  margin: 0 0.35rem 0 0 !important;
+  margin: 0 0.35rem 0.25rem 0 !important;
+  opacity: 1 !important;
   text-transform: uppercase;
+  -webkit-text-fill-color: #12355b !important;
 }
 
-.engine-toggle .wrap,
-.engine-toggle fieldset,
-.engine-toggle .radio-group {
-  align-items: center !important;
-  display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 0.4rem !important;
+.engine-buttons {
+  gap: 0.55rem !important;
 }
 
-.engine-toggle label span {
-  font-size: 0.9rem !important;
+.engine-choice,
+.engine-choice button,
+button.engine-choice,
+.engine-choice > button,
+.engine-choice .wrap,
+.engine-choice .wrap button {
+  background: #fff7cf !important;
+  border: 2px solid rgba(18, 53, 91, 0.18) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 3px 0 rgba(18, 53, 91, 0.12) !important;
+  color: #12355b !important;
+  font-size: 0.95rem !important;
   font-weight: 900 !important;
+  min-height: 38px !important;
+  opacity: 1 !important;
+  padding: 0.35rem 0.75rem !important;
+  -webkit-text-fill-color: #12355b !important;
 }
 
-.engine-toggle input[type='radio'] {
-  transform: scale(0.78);
+.engine-choice *,
+button.engine-choice * {
+  color: inherit !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.engine-choice-local,
+.engine-choice-local button,
+button.engine-choice-local,
+.engine-choice-local > button,
+.engine-choice-local .wrap,
+.engine-choice-local .wrap button {
+  background: #d9ffe9 !important;
+  border-color: var(--readalong-green) !important;
+  color: #145c38 !important;
+  -webkit-text-fill-color: #145c38 !important;
+}
+
+#inference-engine-state {
+  display: none !important;
 }
 
 .reading-card {
@@ -827,35 +888,49 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
   border: 5px solid rgba(18, 53, 91, 0.12);
   border-radius: 34px;
   box-shadow: inset 0 -8px 0 rgba(18, 53, 91, 0.04);
-  padding: clamp(1.15rem, 3vw, 2.2rem);
+  margin: 0 !important;
+  padding: clamp(0.8rem, 2vw, 1.25rem) clamp(1rem, 2.5vw, 1.75rem);
   text-align: center;
 }
 
 .reading-helper {
   font-size: clamp(1.2rem, 3vw, 1.8rem);
   font-weight: 800;
-  margin-bottom: 1rem;
+  margin-bottom: 0.45rem;
   color: #38618c;
 }
 
 .reading-sentence {
   align-items: center;
-  color: #111827;
+  color: #111827 !important;
   display: flex;
   flex-wrap: wrap;
   font-size: clamp(3.25rem, 9vw, 5.4rem);
   font-weight: 900;
   gap: 0.18em;
   justify-content: center;
-  line-height: 1.15;
+  line-height: 1.02;
+  margin: 0 auto !important;
 }
 
 .clickable-word {
   border-radius: 0.35em;
+  color: #111827 !important;
   cursor: pointer;
   display: inline-block;
+  opacity: 1 !important;
   padding: 0.02em 0.12em;
   transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  -webkit-text-fill-color: #111827 !important;
+}
+
+.reading-card .reading-sentence,
+.reading-card .reading-sentence *,
+.prose .reading-sentence,
+.prose .reading-sentence * {
+  color: #111827 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #111827 !important;
 }
 
 .clickable-word:hover, .clickable-word:focus {
@@ -869,19 +944,40 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
   background: rgba(255,255,255,0.54);
   border: 4px solid rgba(18, 53, 91, 0.08);
   border-radius: 32px;
-  padding: 0.7rem;
+  flex: 0 0 auto !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+  min-height: 0 !important;
+  padding: 0.55rem 0.7rem 0.35rem;
   position: relative;
+}
+
+.interaction-zone > * {
+  flex-grow: 0 !important;
+}
+
+.interaction-zone .block,
+.interaction-zone .form,
+.interaction-zone [data-testid='audio'],
+.interaction-zone [data-testid='Audio'] {
+  margin-bottom: 0 !important;
+  min-height: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 #mic-capture {
   border: none !important;
   box-shadow: none !important;
-  min-height: 146px !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+  min-height: 92px !important;
 }
 
 #mic-capture > div,
 #mic-capture .wrap {
-  min-height: 146px !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+  min-height: 92px !important;
 }
 
 #mic-capture .waveform,
@@ -890,8 +986,22 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 #mic-capture button[aria-label*='Trim'],
 #mic-capture button[aria-label*='Download'],
 #mic-capture button[aria-label*='Share'],
+#mic-capture button[aria-label*='Forward'],
+#mic-capture button[aria-label*='Skip'],
+#mic-capture button[aria-label*='Rewind'],
+#mic-capture button[aria-label*='Back'],
+#mic-capture button[aria-label*='Restart'],
+#mic-capture button[aria-label*='Replay'],
 #mic-capture button[aria-label*='Speed'],
 #mic-capture button[aria-label*='Playback speed'],
+#mic-capture button[title*='Forward'],
+#mic-capture button[title*='Skip'],
+#mic-capture button[title*='Rewind'],
+#mic-capture button[title*='Back'],
+#mic-capture button[title*='Restart'],
+#mic-capture button[title*='Replay'],
+#mic-capture button[title*='Speed'],
+#mic-capture button[title*='Playback speed'],
 #mic-capture [aria-label*='microphone' i],
 #mic-capture [aria-label*='input device' i],
 #mic-capture [title*='microphone' i],
@@ -908,6 +1018,10 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 #mic-capture [role='combobox'],
 #mic-capture [class*='device' i],
 #mic-capture [class*='source' i] {
+  display: none !important;
+}
+
+#mic-capture .readalong-hidden-control {
   display: none !important;
 }
 
@@ -991,6 +1105,20 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 
 .action-row {
   gap: 0.75rem !important;
+  margin-bottom: 0.35rem !important;
+}
+
+#feedback-display {
+  margin-top: 0 !important;
+  min-height: 0 !important;
+}
+
+#feedback-display.feedback-wrapper-hidden {
+  display: none !important;
+}
+
+#feedback-display:has(.feedback-hidden) {
+  display: none !important;
 }
 
 @media (max-width: 720px) {
@@ -1086,8 +1214,6 @@ FRONTEND_JS = """
         [/stop/i, 'Stop recording'],
         [/play/i, 'Play your recording'],
         [/pause/i, 'Pause playback'],
-        [/replay|rewind|back/i, 'Go back'],
-        [/forward|skip/i, 'Skip ahead'],
         [/clear|remove|delete|×|x/i, 'Clear recording']
       ];
 
@@ -1105,17 +1231,54 @@ FRONTEND_JS = """
       });
 
       root.querySelectorAll('button, [role="button"]').forEach((button) => {
-        const label = (button.getAttribute('aria-label') || button.getAttribute('title') || button.textContent || '').trim();
-        if (/speed|1x|1\\.0x|playback rate|microphone|headset|input device|g733/i.test(label)) {
-          button.style.display = 'none';
+        const label = [
+          button.getAttribute('aria-label'),
+          button.getAttribute('title'),
+          button.textContent
+        ].filter(Boolean).join(' ').trim();
+        const shouldHide = /speed|1x|1×|1\\.0x|playback rate|rate|undo|redo|rotate|skip|forward|rewind|backward|restart|reset|replay|microphone|headset|input device|g733|↻|↺|⟲|⟳/i.test(label);
+        const shouldKeep = /record|stop|play|pause|clear|remove|delete|volume|mute|speaker|listen|×|x/i.test(label);
+        const rootRect = root.getBoundingClientRect();
+        const buttonRect = button.getBoundingClientRect();
+        const centerX = buttonRect.left + buttonRect.width / 2 - rootRect.left;
+        const centerY = buttonRect.top + buttonRect.height / 2 - rootRect.top;
+        const isBottomRightExtra = centerX > rootRect.width * 0.78 && centerY > rootRect.height * 0.45 && !/clear|remove|delete|×|x/i.test(label);
+        const isSpeedPosition = centerX > rootRect.width * 0.08 && centerX < rootRect.width * 0.25 && centerY > rootRect.height * 0.45;
+        button.classList.toggle('readalong-hidden-control', shouldHide || isBottomRightExtra || !shouldKeep);
+        if (isSpeedPosition && !/volume|mute|speaker/i.test(label)) {
+          button.classList.add('readalong-hidden-control');
+        }
+      });
+
+      root.querySelectorAll('*').forEach((node) => {
+        if (node === root || node.classList.contains('readalong-hidden-control')) return;
+        const rect = node.getBoundingClientRect();
+        if (rect.width < 36 || rect.width > 180 || rect.height < 28 || rect.height > 96) return;
+
+        const rootRect = root.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2 - rootRect.left;
+        const centerY = rect.top + rect.height / 2 - rootRect.top;
+        const text = (node.textContent || '').trim();
+        const isSpeedZone = centerX > rootRect.width * 0.08 && centerX < rootRect.width * 0.26 && centerY > rootRect.height * 0.48;
+        const isRestartZone = centerX > rootRect.width * 0.82 && centerY > rootRect.height * 0.48;
+        const isClearButton = /clear|remove|delete|×|x/i.test(text || node.getAttribute('aria-label') || node.getAttribute('title') || '');
+        const isVolumeButton = /volume|mute|speaker/i.test(text || node.getAttribute('aria-label') || node.getAttribute('title') || '');
+
+        if ((isSpeedZone && !isVolumeButton) || (isRestartZone && !isClearButton)) {
+          node.classList.add('readalong-hidden-control');
         }
       });
 
       root.querySelectorAll('*').forEach((node) => {
         if (node.children.length > 0) return;
         const text = (node.textContent || '').trim();
-        if (/microphone|headset|input device|g733/i.test(text)) {
-          node.style.display = 'none';
+        if (/speed|1x|1×|1\\.0x|playback rate|rate|undo|redo|rotate|skip|forward|rewind|backward|restart|reset|replay|microphone|headset|input device|g733/i.test(text)) {
+          const control = node.closest('button, [role="button"], [class*="button" i], [class*="control" i]');
+          if (control) {
+            control.classList.add('readalong-hidden-control');
+          } else {
+            node.style.display = 'none';
+          }
         }
       });
     };
@@ -1123,13 +1286,18 @@ FRONTEND_JS = """
     const audioObserver = new MutationObserver(polishAudioControls);
     const audioRoot = document.querySelector('#mic-capture');
     if (audioRoot) audioObserver.observe(audioRoot, { childList: true, subtree: true, attributes: true });
+    window.setInterval(polishAudioControls, 500);
 
     const armSuccessAdvance = () => {
       const feedback = document.querySelector('#feedback-display');
       if (!feedback || feedback.dataset.readAlongObserved === 'true') return;
       feedback.dataset.readAlongObserved = 'true';
       let timer = null;
+      const syncFeedbackLayout = () => {
+        feedback.classList.toggle('feedback-wrapper-hidden', Boolean(feedback.querySelector('.feedback-hidden')));
+      };
       const observer = new MutationObserver(() => {
+        syncFeedbackLayout();
         if (feedback.querySelector('.feedback-success')) {
           window.clearTimeout(timer);
           timer = window.setTimeout(() => {
@@ -1138,6 +1306,7 @@ FRONTEND_JS = """
         }
       });
       observer.observe(feedback, { childList: true, subtree: true });
+      syncFeedbackLayout();
     };
     armSuccessAdvance();
     window.setTimeout(armSuccessAdvance, 1000);
@@ -1155,11 +1324,25 @@ def build_app() -> gr.Blocks:
             gr.HTML('<h1 class="app-title">Read-Along AI</h1>')
             with gr.Column(elem_classes="hero-panel"):
                 with gr.Row(elem_classes="top-toolbar"):
+                    with gr.Column(elem_classes="engine-panel"):
+                        gr.HTML('<div class="engine-title">Inference Engine</div>')
+                        with gr.Row(elem_classes="engine-buttons"):
+                            turbo_engine_button = gr.Button(
+                                "⚡ Turbo Mode (Modal)",
+                                elem_classes=["engine-choice", "engine-choice-turbo"],
+                                elem_id="turbo-engine-button",
+                            )
+                            local_engine_button = gr.Button(
+                                "🏕️ Off the Grid Mode (Local)",
+                                elem_classes=["engine-choice", "engine-choice-local"],
+                                elem_id="local-engine-button",
+                            )
                     inference_engine = gr.Radio(
                         choices=INFERENCE_ENGINES,
                         value=LOCAL_ENGINE,
                         label="Inference Engine",
-                        elem_classes="engine-toggle",
+                        visible=False,
+                        elem_id="inference-engine-state",
                     )
                     tts_status_display = gr.HTML(render_tts_status(dict(TTS_PREWARM_STATUS)), elem_id="tts-status-display")
                 reading_canvas = gr.HTML(render_reading_canvas(CURRICULUM[0]))
@@ -1206,6 +1389,20 @@ def build_app() -> gr.Blocks:
             fn=evaluate_reading,
             inputs=[microphone, current_index, inference_engine],
             outputs=[feedback_display, speech_output, success_trigger],
+        )
+
+        turbo_engine_button.click(
+            fn=select_turbo_engine,
+            inputs=current_index,
+            outputs=[inference_engine, tts_status_display, tts_ready_audio],
+            show_progress="hidden",
+        )
+
+        local_engine_button.click(
+            fn=select_local_engine,
+            inputs=current_index,
+            outputs=[inference_engine, tts_status_display, tts_ready_audio],
+            show_progress="hidden",
         )
 
         next_button.click(
