@@ -43,6 +43,9 @@ _whisper_model: Any | None = None
 _voxcpm_model: Any | None = None
 _minicpm_llm: Any | None = None
 
+os.environ.setdefault("TQDM_DISABLE", "1")
+os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
+
 
 def _sanitize_runtime_env_before_torch_import() -> None:
     """Restart once without Conda linker paths that break venv Torch imports."""

@@ -16,11 +16,21 @@ import os
 import re
 import tempfile
 import threading
+import warnings
 import wave
 from array import array
 from math import sqrt
 from pathlib import Path
 from typing import Optional
+
+os.environ.setdefault("TQDM_DISABLE", "1")
+os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
+warnings.filterwarnings(
+    "ignore",
+    message="'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated.*",
+    category=DeprecationWarning,
+    module="gradio.routes",
+)
 
 import gradio as gr
 import modal
