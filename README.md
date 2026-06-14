@@ -112,7 +112,7 @@ COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh -
 * 🏅 **Off-Brand:** The default Gradio UI has been completely overhauled into a child-facing reading app. Evidence:
   * The reading prompt is rendered through custom `gr.HTML`, not a stock textbox, so each word is a keyboard-accessible clickable span with instant word help.
   * `assets/read_along.css` hides default Gradio chrome/API links, restyles the global shell, replaces the stock audio recorder surface with a large read-aloud control, and adds a custom mascot/progress treatment.
-  * `assets/read_along.js` owns the word-help playback path, success auto-advance, and local DOM/CSS confetti burst, avoiding a remote confetti dependency.
+  * `assets/read_along.js` owns the word-help playback path and success auto-advance; the celebration uses a center-burst `canvas-confetti` effect with a local DOM/CSS fallback.
   * The visible workflow is sentence-first and child-sized: no data-science panels, exposed API widgets, or default component labels in the main learning loop.
 * 🏅 **Well-Tuned:** [`kingkw1/minicpm-phonetic-evaluator`](https://huggingface.co/kingkw1/minicpm-phonetic-evaluator)
 * 🏅 **Tiny Titan:** Every individual model used in this pipeline (and their combined footprint) is strictly under the 4B parameter threshold.

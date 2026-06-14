@@ -940,7 +940,7 @@ def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE, sentence: Op
 APP_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = APP_DIR / "assets"
 CUSTOM_CSS = (ASSETS_DIR / "read_along.css").read_text()
-CONFETTI_SCRIPT = ""
+CONFETTI_SCRIPT = "<script src='https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js'></script>"
 FRONTEND_JS = f"<script>{(ASSETS_DIR / 'read_along.js').read_text()}</script>"
 
 
@@ -1056,7 +1056,14 @@ def build_app() -> gr.Blocks:
             inputs=[success_trigger],
             outputs=None,
             js="""(val) => {
-                if (val === 'SUCCESS' && typeof window.readAlongBurstConfetti === 'function') {
+                if (val !== 'SUCCESS') {
+                    return;
+                }
+                if (typeof confetti === 'function') {
+                    confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 } });
+                    return;
+                }
+                if (typeof window.readAlongBurstConfetti === 'function') {
                     window.readAlongBurstConfetti();
                 }
             }""",
