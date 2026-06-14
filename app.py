@@ -560,18 +560,30 @@ def ensure_current_level_prewarm(
     return True, tts_status, ready_words
 
 
-def select_inference_engine(engine_mode: str, current_index: int) -> tuple[str, str, str]:
+def engine_button_classes(engine_mode: str, button_engine: str) -> list[str]:
+    classes = ["engine-choice", "engine-choice-turbo" if button_engine == TURBO_ENGINE else "engine-choice-local"]
+    classes.append("engine-choice-selected" if engine_mode == button_engine else "engine-choice-muted")
+    return classes
+
+
+def select_inference_engine(engine_mode: str, current_index: int) -> tuple[str, dict[str, object], dict[str, object], str, str]:
     """Update the active inference engine without doing heavy work during the click."""
     del current_index
     tts_status, ready_words = current_tts_status()
-    return engine_mode, tts_status, ready_words
+    return (
+        engine_mode,
+        gr.update(elem_classes=engine_button_classes(engine_mode, TURBO_ENGINE)),
+        gr.update(elem_classes=engine_button_classes(engine_mode, LOCAL_ENGINE)),
+        tts_status,
+        ready_words,
+    )
 
 
-def select_turbo_engine(current_index: int) -> tuple[str, str, str]:
+def select_turbo_engine(current_index: int) -> tuple[str, dict[str, object], dict[str, object], str, str]:
     return select_inference_engine(TURBO_ENGINE, current_index)
 
 
-def select_local_engine(current_index: int) -> tuple[str, str, str]:
+def select_local_engine(current_index: int) -> tuple[str, dict[str, object], dict[str, object], str, str]:
     return select_inference_engine(LOCAL_ENGINE, current_index)
 
 
@@ -902,10 +914,46 @@ button.engine-choice-turbo,
 .engine-choice-turbo > button,
 .engine-choice-turbo .wrap,
 .engine-choice-turbo .wrap button {
-  background: #d9ffe9 !important;
-  border-color: var(--readalong-green) !important;
   color: #145c38 !important;
   -webkit-text-fill-color: #145c38 !important;
+}
+
+.engine-choice-selected,
+.engine-choice-selected button,
+button.engine-choice-selected,
+.engine-choice-selected > button,
+.engine-choice-selected .wrap,
+.engine-choice-selected .wrap button {
+  background: #d9ffe9 !important;
+  border-color: var(--readalong-green) !important;
+  box-shadow: 0 4px 0 rgba(34, 197, 94, 0.26), 0 0 0 4px rgba(34, 197, 94, 0.14) !important;
+  transform: translateY(-1px);
+}
+
+.engine-choice-local.engine-choice-selected,
+.engine-choice-local.engine-choice-selected button,
+button.engine-choice-local.engine-choice-selected,
+.engine-choice-local.engine-choice-selected > button,
+.engine-choice-local.engine-choice-selected .wrap,
+.engine-choice-local.engine-choice-selected .wrap button {
+  background: #fff0a8 !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 4px 0 rgba(245, 158, 11, 0.28), 0 0 0 4px rgba(245, 158, 11, 0.14) !important;
+  color: #7a3f00 !important;
+  -webkit-text-fill-color: #7a3f00 !important;
+}
+
+.engine-choice-muted,
+.engine-choice-muted button,
+button.engine-choice-muted,
+.engine-choice-muted > button,
+.engine-choice-muted .wrap,
+.engine-choice-muted .wrap button {
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(18, 53, 91, 0.14) !important;
+  box-shadow: 0 2px 0 rgba(18, 53, 91, 0.08) !important;
+  color: #38618c !important;
+  -webkit-text-fill-color: #38618c !important;
 }
 
 #inference-engine-state {
@@ -1289,12 +1337,12 @@ def build_app() -> gr.Blocks:
                         with gr.Row(elem_classes="engine-buttons"):
                             turbo_engine_button = gr.Button(
                                 "⚡ Turbo Mode (Modal)",
-                                elem_classes=["engine-choice", "engine-choice-turbo"],
+                                elem_classes=engine_button_classes(TURBO_ENGINE, TURBO_ENGINE),
                                 elem_id="turbo-engine-button",
                             )
                             local_engine_button = gr.Button(
                                 "🏕️ Off the Grid Mode (Local)",
-                                elem_classes=["engine-choice", "engine-choice-local"],
+                                elem_classes=engine_button_classes(TURBO_ENGINE, LOCAL_ENGINE),
                                 elem_id="local-engine-button",
                             )
                     inference_engine = gr.Radio(
@@ -1354,14 +1402,14 @@ def build_app() -> gr.Blocks:
         turbo_engine_button.click(
             fn=select_turbo_engine,
             inputs=current_index,
-            outputs=[inference_engine, tts_status_display, tts_ready_audio],
+            outputs=[inference_engine, turbo_engine_button, local_engine_button, tts_status_display, tts_ready_audio],
             show_progress="hidden",
         )
 
         local_engine_button.click(
             fn=select_local_engine,
             inputs=current_index,
-            outputs=[inference_engine, tts_status_display, tts_ready_audio],
+            outputs=[inference_engine, turbo_engine_button, local_engine_button, tts_status_display, tts_ready_audio],
             show_progress="hidden",
         )
 

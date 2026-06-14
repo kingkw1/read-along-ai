@@ -222,6 +222,18 @@ def test_app_defaults_to_turbo_mode() -> None:
     assert engine_radios[0].value == app.TURBO_ENGINE
 
 
+def test_engine_button_classes_reflect_selected_mode() -> None:
+    assert "engine-choice-selected" in app.engine_button_classes(app.TURBO_ENGINE, app.TURBO_ENGINE)
+    assert "engine-choice-muted" in app.engine_button_classes(app.TURBO_ENGINE, app.LOCAL_ENGINE)
+    assert "engine-choice-selected" in app.engine_button_classes(app.LOCAL_ENGINE, app.LOCAL_ENGINE)
+
+    selected_engine, turbo_update, local_update, _tts_status, _ready_words = app.select_local_engine(0)
+
+    assert selected_engine == app.LOCAL_ENGINE
+    assert "engine-choice-muted" in turbo_update["elem_classes"]
+    assert "engine-choice-selected" in local_update["elem_classes"]
+
+
 def test_format_text_for_tts_pads_single_words_only() -> None:
     assert app.format_text_for_tts("cat") == "Cat."
     assert app.format_text_for_tts("fast") == "Fast."
