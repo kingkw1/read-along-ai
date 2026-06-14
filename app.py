@@ -27,9 +27,8 @@ os.environ.setdefault("TQDM_DISABLE", "1")
 os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
 warnings.filterwarnings(
     "ignore",
-    message="'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated.*",
-    category=DeprecationWarning,
-    module="gradio.routes",
+    message=".*HTTP_422_UNPROCESSABLE_ENTITY.*",
+    category=Warning,
 )
 
 import gradio as gr
