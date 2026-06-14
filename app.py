@@ -532,9 +532,23 @@ def current_tts_status() -> tuple[str, str]:
     return render_tts_status(status), json.dumps(ready_audio)
 
 
+def ensure_current_level_prewarm(
+    current_index: int, inference_engine: str = TURBO_ENGINE, prewarm_started: bool = False
+) -> tuple[bool, str, str]:
+    """Start word voice prewarm once after the UI has had a chance to render."""
+    if prewarm_started:
+        tts_status, ready_words = current_tts_status()
+        return True, tts_status, ready_words
+
+    sentence = CURRICULUM[int(current_index) % len(CURRICULUM)]
+    tts_status, ready_words = start_word_voice_prewarm(sentence)
+    return True, tts_status, ready_words
+
+
 def select_inference_engine(engine_mode: str, current_index: int) -> tuple[str, str, str]:
-    """Update the active inference engine and refresh word-help prewarm status."""
-    tts_status, ready_words = prewarm_current_level(current_index, engine_mode)
+    """Update the active inference engine without doing heavy work during the click."""
+    del current_index
+    tts_status, ready_words = current_tts_status()
     return engine_mode, tts_status, ready_words
 
 
@@ -1021,10 +1035,6 @@ button.engine-choice-local,
   display: none !important;
 }
 
-#mic-capture .readalong-hidden-control {
-  display: none !important;
-}
-
 #mic-capture button,
 #mic-capture .record-button {
   background: linear-gradient(135deg, var(--readalong-coral), var(--readalong-orange)) !important;
@@ -1205,89 +1215,6 @@ FRONTEND_JS = """
   };
 
   window.addEventListener('load', () => {
-    const polishAudioControls = () => {
-      const root = document.querySelector('#mic-capture');
-      if (!root) return;
-
-      const tooltipRules = [
-        [/record/i, 'Start recording your reading'],
-        [/stop/i, 'Stop recording'],
-        [/play/i, 'Play your recording'],
-        [/pause/i, 'Pause playback'],
-        [/clear|remove|delete|×|x/i, 'Clear recording']
-      ];
-
-      root.querySelectorAll('button').forEach((button) => {
-        const label = [
-          button.getAttribute('aria-label'),
-          button.getAttribute('title'),
-          button.textContent
-        ].filter(Boolean).join(' ');
-        const rule = tooltipRules.find(([pattern]) => pattern.test(label));
-        if (rule && !button.getAttribute('title')) {
-          button.setAttribute('title', rule[1]);
-          button.setAttribute('aria-label', rule[1]);
-        }
-      });
-
-      root.querySelectorAll('button, [role="button"]').forEach((button) => {
-        const label = [
-          button.getAttribute('aria-label'),
-          button.getAttribute('title'),
-          button.textContent
-        ].filter(Boolean).join(' ').trim();
-        const shouldHide = /speed|1x|1×|1\\.0x|playback rate|rate|undo|redo|rotate|skip|forward|rewind|backward|restart|reset|replay|microphone|headset|input device|g733|↻|↺|⟲|⟳/i.test(label);
-        const shouldKeep = /record|stop|play|pause|clear|remove|delete|volume|mute|speaker|listen|×|x/i.test(label);
-        const rootRect = root.getBoundingClientRect();
-        const buttonRect = button.getBoundingClientRect();
-        const centerX = buttonRect.left + buttonRect.width / 2 - rootRect.left;
-        const centerY = buttonRect.top + buttonRect.height / 2 - rootRect.top;
-        const isBottomRightExtra = centerX > rootRect.width * 0.78 && centerY > rootRect.height * 0.45 && !/clear|remove|delete|×|x/i.test(label);
-        const isSpeedPosition = centerX > rootRect.width * 0.08 && centerX < rootRect.width * 0.25 && centerY > rootRect.height * 0.45;
-        button.classList.toggle('readalong-hidden-control', shouldHide || isBottomRightExtra || !shouldKeep);
-        if (isSpeedPosition && !/volume|mute|speaker/i.test(label)) {
-          button.classList.add('readalong-hidden-control');
-        }
-      });
-
-      root.querySelectorAll('*').forEach((node) => {
-        if (node === root || node.classList.contains('readalong-hidden-control')) return;
-        const rect = node.getBoundingClientRect();
-        if (rect.width < 36 || rect.width > 180 || rect.height < 28 || rect.height > 96) return;
-
-        const rootRect = root.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2 - rootRect.left;
-        const centerY = rect.top + rect.height / 2 - rootRect.top;
-        const text = (node.textContent || '').trim();
-        const isSpeedZone = centerX > rootRect.width * 0.08 && centerX < rootRect.width * 0.26 && centerY > rootRect.height * 0.48;
-        const isRestartZone = centerX > rootRect.width * 0.82 && centerY > rootRect.height * 0.48;
-        const isClearButton = /clear|remove|delete|×|x/i.test(text || node.getAttribute('aria-label') || node.getAttribute('title') || '');
-        const isVolumeButton = /volume|mute|speaker/i.test(text || node.getAttribute('aria-label') || node.getAttribute('title') || '');
-
-        if ((isSpeedZone && !isVolumeButton) || (isRestartZone && !isClearButton)) {
-          node.classList.add('readalong-hidden-control');
-        }
-      });
-
-      root.querySelectorAll('*').forEach((node) => {
-        if (node.children.length > 0) return;
-        const text = (node.textContent || '').trim();
-        if (/speed|1x|1×|1\\.0x|playback rate|rate|undo|redo|rotate|skip|forward|rewind|backward|restart|reset|replay|microphone|headset|input device|g733/i.test(text)) {
-          const control = node.closest('button, [role="button"], [class*="button" i], [class*="control" i]');
-          if (control) {
-            control.classList.add('readalong-hidden-control');
-          } else {
-            node.style.display = 'none';
-          }
-        }
-      });
-    };
-    polishAudioControls();
-    const audioObserver = new MutationObserver(polishAudioControls);
-    const audioRoot = document.querySelector('#mic-capture');
-    if (audioRoot) audioObserver.observe(audioRoot, { childList: true, subtree: true, attributes: true });
-    window.setInterval(polishAudioControls, 500);
-
     const armSuccessAdvance = () => {
       const feedback = document.querySelector('#feedback-display');
       if (!feedback || feedback.dataset.readAlongObserved === 'true') return;
@@ -1318,6 +1245,7 @@ FRONTEND_JS = """
 def build_app() -> gr.Blocks:
     with gr.Blocks(title="Read-Along AI", css=CUSTOM_CSS, head=CONFETTI_SCRIPT + FRONTEND_JS) as demo:
         current_index = gr.State(0)
+        prewarm_started = gr.State(False)
         prewarm_timer = gr.Timer(1)
 
         with gr.Column(elem_classes="main-container"):
@@ -1439,16 +1367,16 @@ def build_app() -> gr.Blocks:
         )
 
         demo.load(
-            fn=prewarm_current_level,
-            inputs=[current_index, inference_engine],
+            fn=current_tts_status,
+            inputs=None,
             outputs=[tts_status_display, tts_ready_audio],
             show_progress="hidden",
         )
 
         prewarm_timer.tick(
-            fn=current_tts_status,
-            inputs=None,
-            outputs=[tts_status_display, tts_ready_audio],
+            fn=ensure_current_level_prewarm,
+            inputs=[current_index, inference_engine, prewarm_started],
+            outputs=[prewarm_started, tts_status_display, tts_ready_audio],
             show_progress="hidden",
         )
     return demo
