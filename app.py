@@ -782,7 +782,7 @@ def listen_to_word(word: str, inference_engine: str = TURBO_ENGINE, sentence: Op
 CUSTOM_CSS = """
 :root {
   --readalong-cream: #fff7df;
-  --readalong-blue: #dff3ff;
+  --readalong-blue: #cfefff;
   --readalong-navy: #12355b;
   --readalong-ink: #244a70;
   --readalong-coral: #ff7a70;
@@ -798,8 +798,8 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
 }
 
 .gradio-container {
-  background: radial-gradient(circle at top left, #fff1b8 0, transparent 30%),
-    linear-gradient(135deg, var(--readalong-cream), var(--readalong-blue)) !important;
+  background: radial-gradient(circle at top left, #ffe7a3 0, transparent 32%),
+    linear-gradient(135deg, #fff1c8 0%, #d7f3ff 52%, #d9f6eb 100%) !important;
   color: var(--readalong-navy) !important;
   font-family: 'Nunito', 'Quicksand', 'Comic Sans MS', system-ui, sans-serif !important;
   min-height: 100vh;
@@ -821,8 +821,9 @@ footer, .api-docs, .built-with, .show-api, .show-api-button, .api-link, .api-lin
   font-weight: 900;
   letter-spacing: 0.02em;
   margin: 0.5rem 0 0;
-  color: var(--readalong-navy);
-  text-shadow: 0 4px 0 rgba(255, 255, 255, 0.9);
+  color: var(--readalong-navy) !important;
+  -webkit-text-fill-color: var(--readalong-navy) !important;
+  text-shadow: 0 3px 0 rgba(255, 255, 255, 0.95);
 }
 
 .hero-panel {
@@ -975,7 +976,8 @@ button.engine-choice-muted,
   font-size: clamp(1.2rem, 3vw, 1.8rem);
   font-weight: 800;
   margin-bottom: 0.45rem;
-  color: #38618c;
+  color: #2d5a84 !important;
+  -webkit-text-fill-color: #2d5a84 !important;
 }
 
 .reading-sentence {
@@ -1143,7 +1145,8 @@ button.engine-choice-muted,
 
 .feedback-card {
   border-radius: 34px;
-  color: var(--readalong-navy);
+  color: var(--readalong-navy) !important;
+  -webkit-text-fill-color: var(--readalong-navy) !important;
   min-height: 96px;
   padding: 0.95rem;
   text-align: center;
@@ -1155,7 +1158,7 @@ button.engine-choice-muted,
 .feedback-retry { background: #ffe4df; border: 5px solid var(--readalong-coral); color: #7a1f18; }
 .feedback-title { font-size: clamp(1.65rem, 4vw, 2.45rem); font-weight: 900; }
 .feedback-subtitle { font-size: clamp(1rem, 2.4vw, 1.35rem); font-weight: 800; }
-.feedback-card * { color: inherit !important; }
+.feedback-card * { color: inherit !important; -webkit-text-fill-color: currentColor !important; opacity: 1 !important; }
 .star-row { font-size: clamp(1.8rem, 4.5vw, 3rem); line-height: 1; }
 .star-row span, .spinner-star { display: inline-block; animation: bounce-star 780ms infinite alternate ease-in-out; }
 .star-row span:nth-child(2) { animation-delay: 120ms; }
@@ -1183,8 +1186,8 @@ button.engine-choice-muted,
   white-space: nowrap;
   width: 1px;
 }
-.voice-status-loading { background: #fff5c7; color: #725300; }
-.voice-status-ready { background: #d9ffe9; color: #145c38; }
+.voice-status-loading { background: #fff0a8; color: #6b3b00 !important; -webkit-text-fill-color: #6b3b00 !important; }
+.voice-status-ready { background: #d9ffe9; color: #145c38 !important; -webkit-text-fill-color: #145c38 !important; }
 
 .control-button button {
   border-radius: 999px !important;
@@ -1210,6 +1213,56 @@ button.engine-choice-muted,
 
 #feedback-display:has(.feedback-hidden) {
   display: none !important;
+}
+
+/* Hugging Face Spaces can inject Gradio theme text colors differently than local
+   Gradio. Keep the critical child-facing labels readable on pale panels. */
+.gradio-container .app-title,
+.gradio-container .app-title * {
+  color: #12355b !important;
+  -webkit-text-fill-color: #12355b !important;
+  opacity: 1 !important;
+}
+
+.gradio-container .voice-status,
+.gradio-container .voice-status * {
+  color: #6b3b00 !important;
+  -webkit-text-fill-color: #6b3b00 !important;
+  opacity: 1 !important;
+}
+
+.gradio-container .voice-status-ready,
+.gradio-container .voice-status-ready * {
+  color: #145c38 !important;
+  -webkit-text-fill-color: #145c38 !important;
+}
+
+.gradio-container .reading-helper,
+.gradio-container .reading-helper * {
+  color: #2d5a84 !important;
+  -webkit-text-fill-color: #2d5a84 !important;
+  opacity: 1 !important;
+}
+
+.gradio-container .feedback-retry,
+.gradio-container .feedback-retry * {
+  color: #7a1f18 !important;
+  -webkit-text-fill-color: #7a1f18 !important;
+  opacity: 1 !important;
+}
+
+.gradio-container .feedback-success,
+.gradio-container .feedback-success * {
+  color: #145c38 !important;
+  -webkit-text-fill-color: #145c38 !important;
+  opacity: 1 !important;
+}
+
+.gradio-container .feedback-loading,
+.gradio-container .feedback-loading * {
+  color: #725300 !important;
+  -webkit-text-fill-color: #725300 !important;
+  opacity: 1 !important;
 }
 
 @media (max-width: 720px) {

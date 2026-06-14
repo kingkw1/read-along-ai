@@ -1,12 +1,15 @@
+--prefer-binary
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 gradio
 modal
 rich
-faster-whisper
-llama-cpp-python
-voxcpm
-torch
-torchaudio
-soundfile
+faster-whisper==1.2.1
+llama-cpp-python==0.3.28
+voxcpm==2.0.3
+torch==2.6.0+cpu
+torchaudio==2.6.0+cpu
+soundfile==0.14.0
 huggingface_hub
 numpy
 scipy
