@@ -827,8 +827,13 @@ def _call_with_engine(function, *args, inference_engine: str):
     return function(*args)
 
 
-def evaluate_reading(audio_filepath: str, current_index: int, inference_engine: str = TURBO_ENGINE) -> tuple[str, Optional[str], str]:
+def evaluate_reading(
+    audio_filepath: Optional[str], current_index: int, inference_engine: str = TURBO_ENGINE
+) -> tuple[str, Optional[str], str]:
     """Evaluate one read attempt against the active curriculum sentence."""
+    if not audio_filepath:
+        return hidden_feedback(), None, ""
+
     transcript = _call_with_engine(transcribe_audio, audio_filepath, inference_engine=inference_engine)
     target_sentence = CURRICULUM[int(current_index) % len(CURRICULUM)]
     print(
@@ -1568,7 +1573,7 @@ def build_app() -> gr.Blocks:
             tts_ready_audio = gr.Textbox(value="{}", visible="hidden", elem_id="tts-ready-audio")
             success_trigger = gr.Textbox(value="", visible=False, elem_id="success-trigger")
 
-        microphone.change(
+        microphone.stop_recording(
             fn=loading_feedback,
             inputs=None,
             outputs=feedback_display,

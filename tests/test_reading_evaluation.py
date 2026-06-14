@@ -80,6 +80,17 @@ def test_evaluate_reading_retries_minicpm_false_verdict(monkeypatch) -> None:
     assert success_trigger == ""
 
 
+def test_evaluate_reading_ignores_cleared_microphone_without_feedback(monkeypatch) -> None:
+    monkeypatch.setattr(app, "transcribe_audio", lambda _path: pytest.fail("cleared microphone should not run ASR"))
+
+    feedback, praise_audio, success_trigger = app.evaluate_reading(None, 0)
+
+    assert "feedback-hidden" in feedback
+    assert "Nice try!" not in feedback
+    assert praise_audio is None
+    assert success_trigger == ""
+
+
 def test_next_sentence_cycles_curriculum_clears_outputs_and_starts_word_prewarm(monkeypatch) -> None:
     prewarm_calls: list[tuple[str, str]] = []
     monkeypatch.setattr(
