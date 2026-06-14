@@ -12,7 +12,8 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def clear_tts_memory_cache() -> None:
+def clear_tts_memory_cache(monkeypatch) -> None:
+    monkeypatch.setattr(app, "LOCAL_LIVE_TTS_ENABLED", False)
     app.TTS_MEMORY_CACHE.clear()
     app.TTS_PREWARM_STATUS.update(
         {
@@ -184,6 +185,87 @@ def test_prewarm_level_words_uses_modal_when_credentials_exist(monkeypatch) -> N
     assert app.TTS_PREWARM_STATUS["failed"] == 0
 
 
+def test_local_sentence_audio_resolves_to_committed_curriculum_wav(monkeypatch) -> None:
+    monkeypatch.setattr(app, "synthesize_speech", lambda _text, _engine: pytest.fail("local demo path should use committed WAV"))
+
+    audio_path = app.listen_to_sentence(0, app.LOCAL_ENGINE)
+
+    assert audio_path == "data/curriculum_audio/comma/01_thecatsat.wav"
+    assert Path(audio_path).exists()
+
+
+def test_local_word_prewarm_uses_label_timings_and_caches_clips(monkeypatch, tmp_path) -> None:
+    audio_path = tmp_path / "sentence.wav"
+    audio_path.write_bytes(silent_wav_bytes(seconds=1.0))
+    label_path = tmp_path / "sentence_labels.txt"
+    label_path.write_text("0.00\t0.20\tthe\n0.30\t0.55\tcat\n0.65\t0.90\tsat\n")
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            [
+                {
+                    "index": 0,
+                    "variant": "comma",
+                    "sentence": "The cat sat.",
+                    "wav": str(audio_path),
+                    "words": ["the", "cat", "sat"],
+                }
+            ]
+        )
+    )
+    monkeypatch.setattr(app, "CURRICULUM_AUDIO_MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(app, "synthesize_speech_bytes", lambda _sentence, _engine: pytest.fail("local labels should avoid live TTS"))
+
+    app.prewarm_level_words("The cat sat.", app.LOCAL_ENGINE)
+
+    assert set(app.TTS_MEMORY_CACHE) == {
+        app.tts_cache_key("The cat sat.", "the"),
+        app.tts_cache_key("The cat sat.", "cat"),
+        app.tts_cache_key("The cat sat.", "sat"),
+    }
+    assert all(audio_bytes.startswith(b"RIFF") for audio_bytes in app.TTS_MEMORY_CACHE.values())
+    assert app.wav_duration_seconds(app.TTS_MEMORY_CACHE[app.tts_cache_key("The cat sat.", "cat")]) > 0.2
+    assert app.TTS_PREWARM_STATUS["ready_words"] == ["the", "cat", "sat"]
+    assert app.TTS_PREWARM_STATUS["clip_method"] == "curriculum_labels"
+    assert app.TTS_PREWARM_STATUS["failed"] == 0
+    assert app.TTS_PREWARM_STATUS["running"] is False
+
+
+def test_local_missing_labels_or_audio_falls_back_gracefully(monkeypatch, tmp_path) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            [
+                {
+                    "index": 0,
+                    "variant": "comma",
+                    "sentence": "The cat sat.",
+                    "wav": str(tmp_path / "missing.wav"),
+                    "words": ["the", "cat", "sat"],
+                }
+            ]
+        )
+    )
+    monkeypatch.setattr(app, "CURRICULUM_AUDIO_MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(app, "synthesize_speech_bytes", lambda _sentence, _engine: pytest.fail("LOCAL_LIVE_TTS defaults off"))
+
+    assert app.listen_to_sentence(0, app.LOCAL_ENGINE) is None
+    app.prewarm_level_words("The cat sat.", app.LOCAL_ENGINE)
+
+    assert app.TTS_MEMORY_CACHE == {}
+    assert app.TTS_PREWARM_STATUS["failed"] == 3
+    assert app.TTS_PREWARM_STATUS["running"] is False
+    assert "Committed curriculum WAV is missing" in app.TTS_PREWARM_STATUS["fallback_reason"]
+
+
+def test_turbo_sentence_audio_behavior_unchanged(monkeypatch) -> None:
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(app, "synthesize_speech", lambda text, engine: calls.append((text, engine)) or "/tmp/turbo.wav")
+
+    assert app.listen_to_sentence(1, app.TURBO_ENGINE) == "/tmp/turbo.wav"
+    assert calls == [("The dog ran fast.", app.TURBO_ENGINE)]
+
+
 def test_reading_canvas_uses_browser_tts_for_word_clicks() -> None:
     sentence_html = app.render_reading_canvas("The cat sat.")
 
@@ -341,6 +423,7 @@ def test_prewarm_level_words_generates_sentence_once_and_caches_word_clips(monke
         lambda _sentence, _audio_bytes: {"the": (0.0, 0.25), "cat": (0.35, 0.65), "sat": (0.75, 1.1)},
     )
 
+    monkeypatch.setattr(app, "LOCAL_LIVE_TTS_ENABLED", True)
     app.prewarm_level_words("The cat sat. The cat!", app.LOCAL_ENGINE)
 
     assert calls == [("The cat sat. The cat!", app.LOCAL_ENGINE)]
@@ -361,7 +444,8 @@ def test_prewarm_level_words_generates_sentence_once_and_caches_word_clips(monke
 def test_prewarm_level_words_does_not_reuse_word_clips_from_previous_sentence(monkeypatch) -> None:
     calls: list[tuple[str, str]] = []
     old_key = app.tts_cache_key("The cat sat.", "the")
-    new_key = app.tts_cache_key("The dog ran fast.", "the")
+    new_sentence = "The bug jumps."
+    new_key = app.tts_cache_key(new_sentence, "the")
     app.TTS_MEMORY_CACHE[old_key] = b"old-the-from-cat"
 
     def fake_synthesize_bytes(sentence: str, engine: str) -> bytes:
@@ -374,15 +458,15 @@ def test_prewarm_level_words_does_not_reuse_word_clips_from_previous_sentence(mo
         "align_sentence_audio_words",
         lambda _sentence, _audio_bytes: {
             "the": (0.0, 0.2),
-            "dog": (0.3, 0.55),
-            "ran": (0.65, 0.9),
-            "fast": (1.0, 1.3),
+            "bug": (0.3, 0.55),
+            "jumps": (0.65, 1.3),
         },
     )
 
-    app.prewarm_level_words("The dog ran fast.", app.LOCAL_ENGINE)
+    monkeypatch.setattr(app, "LOCAL_LIVE_TTS_ENABLED", True)
+    app.prewarm_level_words(new_sentence, app.LOCAL_ENGINE)
 
-    assert calls == [("The dog ran fast.", app.LOCAL_ENGINE)]
+    assert calls == [(new_sentence, app.LOCAL_ENGINE)]
     assert old_key not in app.TTS_MEMORY_CACHE
     assert new_key in app.TTS_MEMORY_CACHE
     assert app.TTS_MEMORY_CACHE[new_key] != b"old-the-from-cat"
