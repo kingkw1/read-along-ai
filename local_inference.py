@@ -36,6 +36,8 @@ MINICPM_INSTRUCTION = (
 )
 DEFAULT_MINICPM_GGUF_PATH = REPO_ROOT / "models" / "minicpm-phonetic-evaluator-Q4_K_M.gguf"
 CONVERTED_MINICPM_GGUF_PATH = REPO_ROOT / "models" / "gguf" / "minicpm-phonetic-evaluator-q4_k_m.gguf"
+DEFAULT_MINICPM_GGUF_REPO_ID = "kingkw1/minicpm-phonetic-evaluator"
+DEFAULT_MINICPM_GGUF_FILENAME = "minicpm-phonetic-evaluator-q4_k_m.gguf"
 
 _whisper_model: Any | None = None
 _voxcpm_model: Any | None = None
@@ -136,7 +138,36 @@ def _resolve_minicpm_gguf_path() -> Path:
         return Path(configured).expanduser().resolve()
     if DEFAULT_MINICPM_GGUF_PATH.exists():
         return DEFAULT_MINICPM_GGUF_PATH
-    return CONVERTED_MINICPM_GGUF_PATH
+    if CONVERTED_MINICPM_GGUF_PATH.exists():
+        return CONVERTED_MINICPM_GGUF_PATH
+
+    if os.environ.get("LOCAL_MINICPM_GGUF_LOCAL_ONLY", "0") == "1":
+        return CONVERTED_MINICPM_GGUF_PATH
+
+    return _download_minicpm_gguf()
+
+
+def _download_minicpm_gguf() -> Path:
+    """Download the Q4 GGUF from the Hub into the Space cache when absent."""
+    from huggingface_hub import hf_hub_download
+
+    repo_id = os.environ.get("LOCAL_MINICPM_GGUF_REPO_ID", DEFAULT_MINICPM_GGUF_REPO_ID)
+    filename = os.environ.get("LOCAL_MINICPM_GGUF_FILENAME", DEFAULT_MINICPM_GGUF_FILENAME)
+    cache_dir = os.environ.get("LOCAL_MODEL_CACHE_DIR")
+    token = (
+        os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+        or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    )
+    downloaded_path = hf_hub_download(
+        repo_id=repo_id,
+        filename=filename,
+        repo_type=os.environ.get("LOCAL_MINICPM_GGUF_REPO_TYPE", "model"),
+        cache_dir=cache_dir,
+        token=token,
+        local_files_only=os.environ.get("LOCAL_MINICPM_GGUF_HF_LOCAL_ONLY", "0") == "1",
+    )
+    return Path(downloaded_path).resolve()
 
 
 def _load_minicpm_llm() -> Any:
@@ -149,7 +180,9 @@ def _load_minicpm_llm() -> Any:
         if not model_path.exists():
             raise FileNotFoundError(
                 "MiniCPM GGUF model not found. Expected "
-                f"{DEFAULT_MINICPM_GGUF_PATH} or set LOCAL_MINICPM_GGUF_PATH."
+                f"{DEFAULT_MINICPM_GGUF_PATH}, {CONVERTED_MINICPM_GGUF_PATH}, "
+                "or a Hub file configured by LOCAL_MINICPM_GGUF_REPO_ID/"
+                "LOCAL_MINICPM_GGUF_FILENAME."
             )
 
         _minicpm_llm = Llama(

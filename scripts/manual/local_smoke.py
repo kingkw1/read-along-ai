@@ -64,7 +64,8 @@ def main() -> int:
     gguf_path = _resolve_minicpm_gguf_path()
     if not gguf_path.exists():
         raise FileNotFoundError(f"MiniCPM Q4 GGUF not found at {gguf_path}")
-    print(f"MiniCPM GGUF: {gguf_path} ({gguf_path.stat().st_size / (1024 ** 3):.2f} GiB)\n")
+    print(f"MiniCPM GGUF: {gguf_path} ({gguf_path.stat().st_size / (1024 ** 3):.2f} GiB)")
+    print("GGUF source: local file or Hugging Face cache resolved by local_inference.py\n")
 
     audio_path = args.audio.expanduser().resolve()
     if not audio_path.exists():

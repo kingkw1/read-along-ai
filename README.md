@@ -59,7 +59,7 @@ The app deliberately ships with both inference paths:
 * **🏕️ Off the Grid Mode (Local):** Runs inside the Hugging Face Space without Modal. Local ASR uses `faster-whisper`, the phonetic evaluator loads the Q4 MiniCPM GGUF through `llama-cpp-python`, and local TTS uses VoxCPM.
 * **⚡ Turbo Mode (Modal):** Routes the same Gradio UI through Modal endpoints for low-latency Cohere ASR, VoxCPM TTS, and the hosted MiniCPM evaluator.
 
-For final judging, Off the Grid Mode should be verified on upgraded Hugging Face Space hardware first. The Q4 GGUF is included in the Space payload at `models/gguf/minicpm-phonetic-evaluator-q4_k_m.gguf`; `LOCAL_MINICPM_GGUF_PATH` only needs to be set if the model is mounted elsewhere.
+For final judging, Off the Grid Mode should be verified on the live Space with Modal credentials absent or unused. The Q4 GGUF is resolved from `LOCAL_MINICPM_GGUF_PATH`, `models/gguf/minicpm-phonetic-evaluator-q4_k_m.gguf`, or downloaded into the Space cache from `kingkw1/minicpm-phonetic-evaluator` as `minicpm-phonetic-evaluator-q4_k_m.gguf`. This keeps the Space repository under the free 1 GB storage limit while still running the evaluator locally through `llama.cpp`.
 
 ## 🏆 Hackathon Eligibility & Attributions
 
@@ -83,6 +83,12 @@ python scripts/manual/local_smoke.py
 ```
 
 This script imports `local_inference.py`, resolves the Q4 GGUF, transcribes a committed curriculum audio file with `faster-whisper`, calls the MiniCPM judge through `llama-cpp-python`, and generates a local VoxCPM audio clip. It does not require Modal credentials.
+
+If the Q4 GGUF is not already published in the model repo, upload it once with:
+
+```bash
+./scripts/upload_gguf_to_hub.sh
+```
 
 ### Badges Claimed (Bonus Quest Champion Strategy)
 * 🏅 **Off-Brand:** The default Gradio UI has been completely overhauled with custom CSS to create a distraction-free, gamified experience for early learners.
