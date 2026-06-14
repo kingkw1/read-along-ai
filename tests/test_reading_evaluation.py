@@ -127,6 +127,22 @@ def test_prewarm_current_level_uses_selected_engine(monkeypatch) -> None:
     assert prewarm_calls == [("The dog ran fast.", app.TURBO_ENGINE)]
 
 
+def test_initial_level_prewarm_uses_selected_engine(monkeypatch) -> None:
+    prewarm_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        app,
+        "start_prewarm_level_words",
+        lambda sentence, engine: prewarm_calls.append((sentence, engine)),
+    )
+
+    prewarm_started, tts_status, ready_audio = app.ensure_current_level_prewarm(0, app.LOCAL_ENGINE, False)
+
+    assert prewarm_started is True
+    assert "Getting word voices ready... 0/3" in tts_status
+    assert json.loads(ready_audio) == {}
+    assert prewarm_calls == [("The cat sat.", app.LOCAL_ENGINE)]
+
+
 def test_prewarm_level_words_skips_modal_without_credentials(monkeypatch, caplog) -> None:
     monkeypatch.delenv("MODAL_TOKEN_ID", raising=False)
     monkeypatch.delenv("MODAL_TOKEN_SECRET", raising=False)
@@ -210,7 +226,7 @@ def test_hidden_audio_outputs_do_not_reserve_layout_space() -> None:
     assert "min-height: 0 !important" in app.CUSTOM_CSS
 
 
-def test_app_defaults_to_turbo_mode() -> None:
+def test_app_defaults_to_off_the_grid_mode() -> None:
     demo = app.build_app()
     engine_radios = [
         block
@@ -219,7 +235,7 @@ def test_app_defaults_to_turbo_mode() -> None:
     ]
 
     assert len(engine_radios) == 1
-    assert engine_radios[0].value == app.TURBO_ENGINE
+    assert engine_radios[0].value == app.LOCAL_ENGINE
 
 
 def test_engine_button_classes_reflect_selected_mode() -> None:

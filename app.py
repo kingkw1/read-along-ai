@@ -35,6 +35,7 @@ MODAL_APP_NAME = "read-along-ai-inference"
 TURBO_ENGINE = "⚡ Turbo Mode (Modal)"
 LOCAL_ENGINE = "🏕️ Off the Grid Mode (Local)"
 INFERENCE_ENGINES = [TURBO_ENGINE, LOCAL_ENGINE]
+DEFAULT_INFERENCE_ENGINE = LOCAL_ENGINE
 
 CURRICULUM = ["The cat sat.", "The dog ran fast.", "She had a red hat.", "I love to play outside."]
 TTS_MEMORY_CACHE: dict[tuple[str, str], bytes] = {}
@@ -526,7 +527,7 @@ def start_prewarm_level_words(sentence: str, engine_mode: str) -> None:
     threading.Thread(target=prewarm_level_words, args=(sentence, engine_mode), daemon=True).start()
 
 
-def start_word_voice_prewarm(sentence: str, engine_mode: str = TURBO_ENGINE) -> tuple[str, str]:
+def start_word_voice_prewarm(sentence: str, engine_mode: str = DEFAULT_INFERENCE_ENGINE) -> tuple[str, str]:
     words = sentence_tts_words(sentence)
     _initialize_prewarm_status(sentence, words)
     if words:
@@ -548,7 +549,7 @@ def current_tts_status() -> tuple[str, str]:
 
 
 def ensure_current_level_prewarm(
-    current_index: int, inference_engine: str = TURBO_ENGINE, prewarm_started: bool = False
+    current_index: int, inference_engine: str = DEFAULT_INFERENCE_ENGINE, prewarm_started: bool = False
 ) -> tuple[bool, str, str]:
     """Start word voice prewarm once after the UI has had a chance to render."""
     if prewarm_started:
@@ -556,7 +557,7 @@ def ensure_current_level_prewarm(
         return True, tts_status, ready_words
 
     sentence = CURRICULUM[int(current_index) % len(CURRICULUM)]
-    tts_status, ready_words = start_word_voice_prewarm(sentence)
+    tts_status, ready_words = start_word_voice_prewarm(sentence, inference_engine)
     return True, tts_status, ready_words
 
 
@@ -1337,17 +1338,17 @@ def build_app() -> gr.Blocks:
                         with gr.Row(elem_classes="engine-buttons"):
                             turbo_engine_button = gr.Button(
                                 "⚡ Turbo Mode (Modal)",
-                                elem_classes=engine_button_classes(TURBO_ENGINE, TURBO_ENGINE),
+                                elem_classes=engine_button_classes(DEFAULT_INFERENCE_ENGINE, TURBO_ENGINE),
                                 elem_id="turbo-engine-button",
                             )
                             local_engine_button = gr.Button(
                                 "🏕️ Off the Grid Mode (Local)",
-                                elem_classes=engine_button_classes(TURBO_ENGINE, LOCAL_ENGINE),
+                                elem_classes=engine_button_classes(DEFAULT_INFERENCE_ENGINE, LOCAL_ENGINE),
                                 elem_id="local-engine-button",
                             )
                     inference_engine = gr.Radio(
                         choices=INFERENCE_ENGINES,
-                        value=TURBO_ENGINE,
+                        value=DEFAULT_INFERENCE_ENGINE,
                         label="Inference Engine",
                         visible=False,
                         elem_id="inference-engine-state",
