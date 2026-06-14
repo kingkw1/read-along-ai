@@ -11,6 +11,8 @@ tags:
   - build-small-hackathon
   - backyard-ai
   - off-brand
+  - off-the-grid
+  - llama-champion
   - tiny-titan
   - sharing-is-caring
   - field-notes
@@ -19,7 +21,7 @@ tags:
 
 # 🦉 Read-Along AI: The Offline Reading Teacher
 
-**Live App:** [Insert Hugging Face Space Link]
+**Live App:** [read-along-ai](https://huggingface.co/spaces/build-small-hackathon/read-along-ai)
 
 **Organization:** Hosted under the official [`build-small-hackathon`](https://huggingface.co/build-small-hackathon) HF Org.
 
@@ -46,10 +48,18 @@ For a deep dive into the architecture and development plan, please review our sp
 
 ### Components
 * **Frontend:** A custom, gamified Gradio interface ("Off-Brand" UI) built for legibility and young readers.
-* **ASR (Speech-to-Text):** **Cohere Transcribe** (2B parameters). Optimized for low-latency voice capture to process the child's reading attempts instantly.
+* **ASR (Speech-to-Text):** **Cohere Transcribe** (2B parameters) in Turbo Mode and `faster-whisper` `tiny.en` in Off the Grid Mode.
 * **Reading Evaluator:** A fine-tuned **MiniCPM phonetic evaluator** (`kingkw1/minicpm-phonetic-evaluator`) judges close or ambiguous ASR transcripts after exact normalized matching.
-* **TTS (Text-to-Speech):** **OpenBMB VoxCPM** (*[Insert Parameter Count]*). This acts as the central interactive component for sentence read-back and on-demand word assistance.
+* **TTS (Text-to-Speech):** **OpenBMB VoxCPM** (0.5B parameters). This acts as the central interactive component for sentence read-back and on-demand word assistance.
 * **Compute / Inference:** Utilizes a **Dual-Mode Hybrid Architecture**. The app includes **Turbo Mode** for Modal serverless endpoints and **Off the Grid Mode** for local Hugging Face Space resources.
+
+### Dual-Mode Inference Engine
+The app deliberately ships with both inference paths:
+
+* **🏕️ Off the Grid Mode (Local):** Runs inside the Hugging Face Space without Modal. Local ASR uses `faster-whisper`, the phonetic evaluator loads the Q4 MiniCPM GGUF through `llama-cpp-python`, and local TTS uses VoxCPM.
+* **⚡ Turbo Mode (Modal):** Routes the same Gradio UI through Modal endpoints for low-latency Cohere ASR, VoxCPM TTS, and the hosted MiniCPM evaluator.
+
+For final judging, Off the Grid Mode should be verified on upgraded Hugging Face Space hardware first. The Q4 GGUF is included in the Space payload at `models/gguf/minicpm-phonetic-evaluator-q4_k_m.gguf`; `LOCAL_MINICPM_GGUF_PATH` only needs to be set if the model is mounted elsewhere.
 
 ## 🏆 Hackathon Eligibility & Attributions
 
@@ -65,9 +75,18 @@ This entire application, including the Gradio UI and backend Modal logic, was or
 ### Modal Compute Awards
 The high-speed inference endpoints powering the primary "Turbo Mode" are hosted entirely on **Modal**. This provides the necessary sub-second response times required to keep a young child focused. We also utilized Modal A100s for a rapid fine-tuning job to train the phonetic evaluator model.
 
+### Local Verification
+The repository includes a local-only smoke script for the Space path:
+
+```bash
+python scripts/manual/local_smoke.py
+```
+
+This script imports `local_inference.py`, resolves the Q4 GGUF, transcribes a committed curriculum audio file with `faster-whisper`, calls the MiniCPM judge through `llama-cpp-python`, and generates a local VoxCPM audio clip. It does not require Modal credentials.
+
 ### Badges Claimed (Bonus Quest Champion Strategy)
 * 🏅 **Off-Brand:** The default Gradio UI has been completely overhauled with custom CSS to create a distraction-free, gamified experience for early learners.
-* 🏅 **Well-Tuned:** *[Insert Hugging Face Link to the fine-tuned model created during Phase 2]*
+* 🏅 **Well-Tuned:** [`kingkw1/minicpm-phonetic-evaluator`](https://huggingface.co/kingkw1/minicpm-phonetic-evaluator)
 * 🏅 **Tiny Titan:** Every individual model used in this pipeline (and their combined footprint) is strictly under the 4B parameter threshold.
   * *Parameter Math:* Cohere Transcribe/faster-whisper (2B / 0.04B) + OpenBMB VoxCPM (0.5B) + MiniCPM Evaluator (2.4B) = ***2.9B Total Parameters***.
 * 🏅 **Off the Grid:** The app includes a UI toggle that disconnects from Modal and runs `faster-whisper`, `llama.cpp`, and VoxCPM entirely locally inside the Hugging Face Space.

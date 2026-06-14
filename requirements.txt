@@ -1,3 +1,13 @@
 gradio
 modal
 rich
+faster-whisper
+llama-cpp-python
+voxcpm
+torch
+torchaudio
+soundfile
+huggingface_hub
+numpy
+scipy
+sentencepiece

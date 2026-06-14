@@ -21,11 +21,19 @@ fi
 rm -rf "${STAGING_DIR}"
 mkdir -p "${STAGING_DIR}"
 
-cp README.md LICENSE app.py local_inference.py modal_inference.py requirements.txt "${STAGING_DIR}/"
+cp README.md LICENSE app.py local_inference.py modal_inference.py requirements.txt packages.txt "${STAGING_DIR}/"
 cp -R docs data "${STAGING_DIR}/"
 
+Q4_GGUF_PATH="models/gguf/minicpm-phonetic-evaluator-q4_k_m.gguf"
+if [[ ! -f "${Q4_GGUF_PATH}" ]]; then
+  echo "Missing required local MiniCPM Q4 GGUF: ${Q4_GGUF_PATH}" >&2
+  exit 1
+fi
+mkdir -p "${STAGING_DIR}/models/gguf"
+cp "${Q4_GGUF_PATH}" "${STAGING_DIR}/${Q4_GGUF_PATH}"
+
 # Keep the public Space payload tight. The app does not need local raw audio,
-# processed child-voice clips, notebook outputs, local model artifacts, or caches.
+# processed child-voice clips, notebook outputs, f16 model artifacts, or caches.
 rm -rf \
   "${STAGING_DIR}/data/raw_audio" \
   "${STAGING_DIR}/data/processed_audio" \

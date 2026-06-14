@@ -1,0 +1,5 @@
+build-essential
+cmake
+ffmpeg
+libgomp1
+libsndfile1
