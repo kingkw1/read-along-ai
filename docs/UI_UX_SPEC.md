@@ -33,7 +33,7 @@ The app should utilize a single-column, centered layout (`gr.Column(elem_classes
 
 ### Bottom: The Reward & Control Container
 * **Feedback Display (`gr.HTML`):** A dedicated, hidden container used exclusively for rendering success animations (e.g., CSS keyframe bouncing stars, confetti emojis, or a smiling mascot).
-* **Navigation Controls:** Two simple, oversized buttons: "Next Sentence" and "Listen to Sentence" (triggers the full sentence TTS). Existing button labels may say "Next Level" during polish, but the product behavior is sentence advancement.
+* **Navigation Controls:** Two simple, oversized buttons: "Next Sentence" and "Listen to Sentence" (triggers full-sentence audio playback). Existing button labels may say "Next Level" during polish, but the product behavior is sentence advancement.
 
 ## 4. Frontend-to-Backend Event Mapping
 Codex must wire the Gradio events as follows:

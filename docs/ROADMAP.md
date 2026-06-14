@@ -50,7 +50,7 @@ The original multi-level reading plan has been deferred. The submission MVP is s
   * Create `local_inference.py` to house the local execution logic.
   * Integrate `faster-whisper` (tiny.en) for local ASR.
   * Use `llama-cpp-python` bindings to load the quantized MiniCPM evaluator locally.
-  * Load VoxCPM via local PyTorch/ONNX.
+  * Use committed curriculum WAVs and label timings for responsive local audio help, with live local VoxCPM kept as an opt-in fallback.
   * Wire the toggle to route to either `modal_inference.py` or `local_inference.py`.
 * **Verification Checkpoint 4:** **Deploy to the Hugging Face Space. Flip the toggle to "Off the Grid Mode" and manually verify that a read attempt executes completely locally without calling Modal APIs.**
 

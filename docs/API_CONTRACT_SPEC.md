@@ -43,7 +43,7 @@ Codex should write the Modal stub functions that the wrappers above will call. W
 ## 3.5 Local Endpoint Contracts (Off the Grid Backend)
 Codex should write equivalent functions in `local_inference.py` to mirror the inputs/outputs above.
 * **ASR:** Implement `faster-whisper` using the `tiny.en` model.
-* **TTS:** Load VoxCPM directly using PyTorch or ONNX.
+* **TTS / Audio Help:** Default Off the Grid audio help should use committed curriculum WAVs in `data/curriculum_audio/` and prewarm word clips by slicing the matching label/timing files. Live local VoxCPM remains an optional fallback only when `LOCAL_LIVE_TTS=1` is set.
 * **Evaluator:** Use `llama-cpp-python` to load the `minicpm-phonetic-evaluator-Q4_K_M.gguf` file.
 
 ## 4. Error Handling & Fallbacks
@@ -51,7 +51,7 @@ Young users cannot parse stack traces.
 * If the Modal ASR endpoint times out or fails, the `transcribe_audio` wrapper must catch the exception and return a specific string: `"[ASR_ERROR]"`. The Gradio UI must handle this silently by asking the user to "Try pressing record again!"
 * If the TTS endpoint fails, `synthesize_speech` must return `None`, and the UI should gracefully fail open (no audio plays, but the UI does not freeze).
 * If the MiniCPM evaluator fails, the wrapper should fail closed and return `False` so incorrect readings are not accidentally marked as successful.
-* Word-click assistance should not block the UI. The current app pre-generates word clips from sentence TTS where possible and falls back to browser speech synthesis when cached audio is unavailable.
+* Word-click assistance should not block the UI. The current app prewarms word clips from committed curriculum label timings in Off the Grid Mode, pre-generates from sentence TTS in Turbo Mode where possible, and falls back to browser speech synthesis when cached audio is unavailable.
 
 ## 5. Testing Strategy
 As explicitly defined in Phase 1 (Verification Checkpoint 2), the backend API contract must be strictly isolated for testing:
