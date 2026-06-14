@@ -111,6 +111,7 @@ case "${SPACE_PROFILE}" in
 esac
 
 cp README.md LICENSE app.py local_inference.py modal_inference.py packages.txt "${STAGING_DIR}/"
+cp -R assets "${STAGING_DIR}/"
 if [[ "${SPACE_PROFILE}" == "ui" ]]; then
   cat > "${STAGING_DIR}/requirements.txt" <<'EOF'
 gradio

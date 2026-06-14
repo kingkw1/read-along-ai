@@ -7,6 +7,7 @@ This document outlines the strict deployment architecture for hosting Read-Along
 Codex must generate and organize the repository using the following flat structure to comply with Hugging Face Spaces requirements:
 
 * `/app.py` - The main Gradio application and UI logic.
+* `/assets/` - Custom CSS and browser JavaScript loaded by `app.py` at startup.
 * `/modal_inference.py` - The Modal backend definitions (`@app.function()` for Cohere, OpenBMB, and the fine-tuned MiniCPM evaluator).
 * `/requirements.txt` - The full local-inference Python dependencies for the main Hugging Face Space.
 * `/packages.txt` - System packages needed by the local inference stack.
