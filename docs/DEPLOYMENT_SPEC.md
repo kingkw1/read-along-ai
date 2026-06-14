@@ -24,7 +24,7 @@ Codex must generate and organize the repository using the following flat structu
 The deployment has two possible runtime profiles:
 
 * **UI iteration Space:** Keep dependencies light (`gradio`, `modal`, `rich`) and use `build-small-hackathon/read-along-ai-ui` for fast visual iteration.
-* **Off the Grid submission Space:** Include the local inference stack needed by `local_inference.py`, including `faster-whisper`, CPU Torch/VoxCPM dependencies, and `llama-cpp-python`.
+* **Off the Grid submission Space:** Include the local inference stack needed by `local_inference.py`, including `faster-whisper`, CPU Torch/VoxCPM dependencies, and `llama-cpp-python`. The default local audio-assistance path should use committed curriculum WAVs and label files; live local VoxCPM is opt-in with `LOCAL_LIVE_TTS=1`.
 
 The main Space uses Python 3.11 and CPU-specific dependency pins to avoid the free-tier builder pulling large CUDA wheels or compiling `llama-cpp-python` from source. The Q4 GGUF is **not** uploaded to the Space repo because the Space has a 1 GB repository storage limit. Instead, `local_inference.py` resolves `minicpm-phonetic-evaluator-q4_k_m.gguf` from `LOCAL_MINICPM_GGUF_PATH`, a local checked-out model path, or the Hugging Face model cache after downloading it from `kingkw1/minicpm-phonetic-evaluator`.
 
@@ -41,7 +41,7 @@ When the developer pushes to the main branch, the expected execution flow is:
 1. **Backend Deploy:** The developer runs `modal deploy modal_inference.py` locally to push the ASR, TTS, and MiniCPM evaluator endpoints to the cloud.
 2. **Frontend Sync:** The developer deploys the vetted public Space payload with `scripts/deploy_space.sh` rather than pushing the whole repository to the Space remote.
 3. **Runtime:** When a user visits the Space, `app.py` boots up the Gradio UI. The inference-engine toggle routes read attempts through either Modal endpoints or local inference, depending on the selected mode and deployed assets.
-4. **Submission Verification:** Before claiming Off the Grid or Llama Champion, manually verify the submitted Space can complete a read attempt in local mode without calling Modal. The current deployed local path has completed a short recorded sentence in roughly 10 seconds end-to-end.
+4. **Submission Verification:** Before claiming Off the Grid or Llama Champion, manually verify the submitted Space can complete a read attempt in local mode without calling Modal. Also verify "Listen to Sentence" resolves to the committed curriculum WAV and word clicks use cached label-sliced clips or browser speech fallback rather than on-demand live TTS. The current deployed local path has completed a short recorded sentence in roughly 10 seconds end-to-end.
 
 ### Space Upload Shortcut
 The Hugging Face Space is treated as a deployment target, while GitHub remains the source-of-truth repository. Deploy the main submission Space with:

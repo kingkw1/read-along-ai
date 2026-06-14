@@ -25,7 +25,7 @@ The goal is to prove the end-to-end read-aloud loop, phonetic tolerance, local/c
 * **Objective:** Practice confidence, fluency, and sight-word tracking on short sentences.
 * **UI State:** One large sentence, rendered as clickable word spans.
 * **Behavior:** The system evaluates the full recorded sentence against the displayed target.
-* **Assistance:** Clicking an individual word plays a cached local word clip when available, with browser speech synthesis as a fallback. Clicking "Listen to Sentence" plays the full sentence using VoxCPM.
+* **Assistance:** Clicking an individual word plays a cached word clip when available, with browser speech synthesis as a fallback. In Off the Grid Mode, "Listen to Sentence" plays the committed curriculum WAV and word clips are sliced from local label timings. In Turbo Mode, sentence and helper audio continue to use VoxCPM through Modal.
 
 ## 3. Phonetic Evaluation Logic
 Children have developing articulation. Standard ASR will often misinterpret their speech, and strict string matching can turn an acceptable read attempt into a discouraging failure. The target evaluation stack is therefore:

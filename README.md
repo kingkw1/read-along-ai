@@ -50,19 +50,19 @@ For a deep dive into the architecture and development plan, please review our sp
 * **Frontend:** A custom, gamified Gradio interface ("Off-Brand" UI) built for legibility and young readers.
 * **ASR (Speech-to-Text):** **Cohere Transcribe** (2B parameters) in Turbo Mode and `faster-whisper` `tiny.en` in Off the Grid Mode.
 * **Reading Evaluator:** A fine-tuned **MiniCPM phonetic evaluator** (`kingkw1/minicpm-phonetic-evaluator`) judges close or ambiguous ASR transcripts after exact normalized matching.
-* **TTS (Text-to-Speech):** **OpenBMB VoxCPM** (0.5B parameters). This acts as the central interactive component for sentence read-back and on-demand word assistance.
+* **TTS / Audio Help:** **OpenBMB VoxCPM** (0.5B parameters) powers Modal Turbo Mode and was used to generate local curriculum audio assets. Off the Grid Mode defaults to committed sentence WAVs plus label-sliced word clips for responsive local assistance.
 * **Compute / Inference:** Utilizes a **Dual-Mode Hybrid Architecture**. The app includes **Turbo Mode** for Modal serverless endpoints and **Off the Grid Mode** for local Hugging Face Space resources.
 
 ### Dual-Mode Inference Engine
 The app deliberately ships with both inference paths:
 
-* **🏕️ Off the Grid Mode (Local):** Runs inside the Hugging Face Space without Modal. Local ASR uses `faster-whisper`, the phonetic evaluator loads the Q4 MiniCPM GGUF through `llama-cpp-python`, and local TTS uses VoxCPM.
+* **🏕️ Off the Grid Mode (Local):** Runs inside the Hugging Face Space without Modal. Local ASR uses `faster-whisper`, the phonetic evaluator loads the Q4 MiniCPM GGUF through `llama-cpp-python`, and audio assistance uses committed curriculum WAVs from `data/curriculum_audio/` with word clips sliced from label timings. Live local VoxCPM is available only as an optional fallback with `LOCAL_LIVE_TTS=1`.
 * **⚡ Turbo Mode (Modal):** Routes the same Gradio UI through Modal endpoints for low-latency Cohere ASR, VoxCPM TTS, and the hosted MiniCPM evaluator.
 
 For final judging, Off the Grid Mode should be verified on the live Space with Modal credentials absent or unused. The Q4 GGUF is resolved from `LOCAL_MINICPM_GGUF_PATH`, `models/gguf/minicpm-phonetic-evaluator-q4_k_m.gguf`, or downloaded into the Space cache from `kingkw1/minicpm-phonetic-evaluator` as `minicpm-phonetic-evaluator-q4_k_m.gguf`. This keeps the Space repository under the free 1 GB storage limit while still running the evaluator locally through `llama.cpp`.
 
 ### Badge Verification Notes
-* **Off the Grid:** The live Space has been verified in Off the Grid Mode on a short recorded sentence. The local path runs without Modal calls: `faster-whisper` transcribes the microphone audio, VoxCPM generates local speech, and the MiniCPM evaluator runs from local GGUF weights after the Space caches the model file.
+* **Off the Grid:** The live Space has been verified in Off the Grid Mode on a short recorded sentence. The local path runs without Modal calls: `faster-whisper` transcribes the microphone audio, committed curriculum WAVs provide sentence and word audio help, and the MiniCPM evaluator runs from local GGUF weights after the Space caches the model file.
 * **Llama Champion:** The phonetic evaluator loads `minicpm-phonetic-evaluator-q4_k_m.gguf` through `llama-cpp-python`, the Python binding for `llama.cpp`.
 * **Runtime note:** A roughly 3-second reading attempt currently takes about 10 seconds end-to-end in local mode on the deployed Space. This is acceptable for the hackathon MVP and keeps the privacy-preserving path demonstrable.
 * **Scope note:** “Off the Grid” here means no external/cloud inference APIs during local mode. The Space may download model weights from Hugging Face into its cache, but inference itself runs in the Space process.
@@ -88,7 +88,7 @@ The repository includes a local-only smoke script for the Space path:
 python scripts/manual/local_smoke.py
 ```
 
-This script imports `local_inference.py`, resolves the Q4 GGUF, transcribes a committed curriculum audio file with `faster-whisper`, calls the MiniCPM judge through `llama-cpp-python`, and generates a local VoxCPM audio clip. It does not require Modal credentials.
+This script imports `local_inference.py`, resolves the Q4 GGUF, transcribes a committed curriculum audio file with `faster-whisper`, and calls the MiniCPM judge through `llama-cpp-python`. The app's default local demo path uses committed curriculum WAVs for audio help; live local VoxCPM can be enabled explicitly with `LOCAL_LIVE_TTS=1` for fallback testing. It does not require Modal credentials.
 
 If the Q4 GGUF is not already published in the model repo, upload it once with:
 
@@ -113,7 +113,7 @@ COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh -
 * 🏅 **Well-Tuned:** [`kingkw1/minicpm-phonetic-evaluator`](https://huggingface.co/kingkw1/minicpm-phonetic-evaluator)
 * 🏅 **Tiny Titan:** Every individual model used in this pipeline (and their combined footprint) is strictly under the 4B parameter threshold.
   * *Parameter Math:* Cohere Transcribe/faster-whisper (2B / 0.04B) + OpenBMB VoxCPM (0.5B) + MiniCPM Evaluator (2.4B) = ***2.9B Total Parameters***.
-* 🏅 **Off the Grid:** The app includes a UI toggle that disconnects from Modal and runs `faster-whisper`, `llama.cpp`, and VoxCPM locally inside the Hugging Face Space.
+* 🏅 **Off the Grid:** The app includes a UI toggle that disconnects from Modal and runs `faster-whisper` plus the MiniCPM evaluator through `llama.cpp` locally inside the Hugging Face Space. Local sentence and word audio assistance comes from committed WAV assets, with live local VoxCPM kept as an opt-in fallback.
 * 🏅 **Llama Champion:** The local phonetic evaluator runs the Q4 GGUF through `llama-cpp-python`.
 * 🏅 **Sharing is Caring:** *[Insert Hugging Face Dataset Link to Codex Agent Traces]*
 * 🏅 **Field Notes:** *[Insert Link to Blog Post / Medium Article]*
@@ -121,7 +121,7 @@ COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh -
 ## 🚀 How It Works
 The hackathon MVP is focused on a stable sentence-reading loop:
 1. **Choose a sentence:** The app displays one short curriculum sentence in large, clickable text.
-2. **Get help when needed:** The child can tap a word to hear it, or press "Listen to Sentence" for a full VoxCPM read-back.
+2. **Get help when needed:** The child can tap a word to hear a cached clip, or press "Listen to Sentence" for the committed local sentence WAV in Off the Grid Mode. Turbo Mode continues to use VoxCPM through Modal.
 3. **Read aloud:** The child records an attempt through the microphone.
 4. **Evaluate gently:** The app accepts exact normalized matches immediately, then asks the fine-tuned MiniCPM evaluator to judge close child-speech or ASR variants.
 5. **Celebrate or retry:** Correct readings trigger confetti and advance to the next sentence; rejected readings get a simple, encouraging retry prompt.

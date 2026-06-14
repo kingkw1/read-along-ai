@@ -63,6 +63,9 @@ TTS_CACHE_LOCK = threading.Lock()
 SAMPLE_RATE = 16_000
 DUMMY_AUDIO_SECONDS = 1
 WORD_CLIP_PADDING_SECONDS = 0.06
+CURRICULUM_AUDIO_MANIFEST_PATH = Path("data/curriculum_audio/manifest.json")
+LOCAL_CURRICULUM_AUDIO_VARIANT = os.environ.get("LOCAL_CURRICULUM_AUDIO_VARIANT", "comma")
+LOCAL_LIVE_TTS_ENABLED = os.environ.get("LOCAL_LIVE_TTS", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _write_silent_wav(label: str = "speech") -> str:
@@ -148,6 +151,8 @@ def synthesize_speech_bytes(target_text: str, inference_engine: str = TURBO_ENGI
     """Return generated speech as WAV bytes for in-memory caching."""
     tts_text = format_text_for_tts(target_text)
     if inference_engine == LOCAL_ENGINE:
+        if not LOCAL_LIVE_TTS_ENABLED:
+            raise RuntimeError("Local live VoxCPM TTS is disabled; set LOCAL_LIVE_TTS=1 to enable fallback generation.")
         return Path(local_synthesize_speech(tts_text)).read_bytes()
     return run_voxcpm_tts(tts_text)
 
@@ -185,6 +190,76 @@ def sentence_tts_words(sentence: str) -> list[str]:
 def tts_cache_key(sentence: str, word: str) -> tuple[str, str]:
     return normalize_text(sentence), clean_tts_word(word)
 
+
+def _curriculum_audio_entries() -> list[dict[str, object]]:
+    try:
+        return json.loads(CURRICULUM_AUDIO_MANIFEST_PATH.read_text())
+    except Exception as exc:
+        LOGGER.warning("Could not read local curriculum audio manifest: %s", exc)
+        return []
+
+
+def local_curriculum_audio_entry(sentence: str, variant: str = LOCAL_CURRICULUM_AUDIO_VARIANT) -> Optional[dict[str, object]]:
+    """Return the committed local audio manifest entry for a curriculum sentence."""
+    sentence_key = normalize_text(sentence)
+    fallback_entry: Optional[dict[str, object]] = None
+    for entry in _curriculum_audio_entries():
+        if normalize_text(str(entry.get("sentence", ""))) != sentence_key:
+            continue
+        if entry.get("variant") == variant:
+            return entry
+        fallback_entry = fallback_entry or entry
+    return fallback_entry
+
+
+def local_curriculum_audio_path(sentence: str) -> Optional[Path]:
+    entry = local_curriculum_audio_entry(sentence)
+    if not entry:
+        return None
+    wav_path = Path(str(entry.get("wav", "")))
+    if wav_path.exists():
+        return wav_path
+    return None
+
+
+def local_curriculum_label_path(audio_path: Path) -> Path:
+    return audio_path.with_name(f"{audio_path.stem}_labels.txt")
+
+
+def read_curriculum_word_timestamps(label_path: Path) -> dict[str, tuple[float, float]]:
+    """Read Audacity-style start/end/word labels for committed local curriculum audio."""
+    timestamps: dict[str, tuple[float, float]] = {}
+    for line in label_path.read_text().splitlines():
+        parts = line.strip().split()
+        if len(parts) < 3:
+            continue
+        start_text, end_text, *word_parts = parts
+        word = clean_tts_word(" ".join(word_parts))
+        if not word:
+            continue
+        start = float(start_text)
+        end = float(end_text)
+        if end <= start:
+            raise ValueError(f"invalid label timestamp for {word!r}: {start}-{end}")
+        timestamps.setdefault(word, (start, end))
+    return timestamps
+
+
+def slice_local_curriculum_word_clips(sentence: str) -> tuple[dict[str, bytes], str]:
+    """Slice committed local curriculum WAVs with checked-in label timings."""
+    audio_path = local_curriculum_audio_path(sentence)
+    if audio_path is None:
+        return {}, "Committed curriculum WAV is missing."
+    label_path = local_curriculum_label_path(audio_path)
+    if not label_path.exists():
+        return {}, "Committed curriculum word label file is missing."
+    try:
+        timestamps = read_curriculum_word_timestamps(label_path)
+        clips = slice_sentence_audio_by_timestamps(sentence, audio_path.read_bytes(), timestamps)
+    except Exception as exc:
+        LOGGER.warning("Could not slice committed curriculum audio for %r: %s", sentence, exc)
+        return {}, str(exc)
+    return clips, ""
 
 def wav_duration_seconds(audio_bytes: bytes) -> float:
     with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
@@ -494,22 +569,55 @@ def prewarm_level_words(sentence: str, engine_mode: str) -> None:
         LOGGER.info("Skipping Modal word voice prewarm because Modal credentials are not configured")
         return
 
-    try:
-        sentence_audio = synthesize_speech_bytes(sentence, engine_mode)
-        method_report: dict[str, str] = {}
-        word_clips = slice_sentence_audio_with_alignment_or_fallback(sentence, sentence_audio, method_report)
-        with TTS_CACHE_LOCK:
-            if TTS_PREWARM_STATUS.get("sentence") == sentence:
-                TTS_PREWARM_STATUS["clip_method"] = method_report.get("method", "")
-                TTS_PREWARM_STATUS["fallback_reason"] = method_report.get("fallback_reason", "")
-    except Exception as exc:
-        LOGGER.exception("Word voice prewarm failed for sentence %r", sentence)
-        with TTS_CACHE_LOCK:
-            if TTS_PREWARM_STATUS.get("sentence") == sentence:
-                TTS_PREWARM_STATUS["failed"] = int(TTS_PREWARM_STATUS.get("failed", 0)) + len(missing_words)
-                TTS_PREWARM_STATUS["running"] = False
-                TTS_PREWARM_STATUS["fallback_reason"] = str(exc)
-        return
+    if engine_mode == LOCAL_ENGINE:
+        word_clips, fallback_reason = slice_local_curriculum_word_clips(sentence)
+        if word_clips:
+            with TTS_CACHE_LOCK:
+                if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                    TTS_PREWARM_STATUS["clip_method"] = "curriculum_labels"
+                    TTS_PREWARM_STATUS["fallback_reason"] = ""
+        elif not LOCAL_LIVE_TTS_ENABLED:
+            with TTS_CACHE_LOCK:
+                if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                    TTS_PREWARM_STATUS["failed"] = int(TTS_PREWARM_STATUS.get("failed", 0)) + len(missing_words)
+                    TTS_PREWARM_STATUS["running"] = False
+                    TTS_PREWARM_STATUS["fallback_reason"] = fallback_reason
+            LOGGER.info("Local curriculum word clips unavailable; browser word help will be used: %s", fallback_reason)
+            return
+        else:
+            try:
+                sentence_audio = synthesize_speech_bytes(sentence, engine_mode)
+                method_report: dict[str, str] = {}
+                word_clips = slice_sentence_audio_with_alignment_or_fallback(sentence, sentence_audio, method_report)
+                with TTS_CACHE_LOCK:
+                    if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                        TTS_PREWARM_STATUS["clip_method"] = method_report.get("method", "")
+                        TTS_PREWARM_STATUS["fallback_reason"] = method_report.get("fallback_reason", "")
+            except Exception as exc:
+                LOGGER.exception("Word voice prewarm failed for sentence %r", sentence)
+                with TTS_CACHE_LOCK:
+                    if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                        TTS_PREWARM_STATUS["failed"] = int(TTS_PREWARM_STATUS.get("failed", 0)) + len(missing_words)
+                        TTS_PREWARM_STATUS["running"] = False
+                        TTS_PREWARM_STATUS["fallback_reason"] = str(exc)
+                return
+    else:
+        try:
+            sentence_audio = synthesize_speech_bytes(sentence, engine_mode)
+            method_report: dict[str, str] = {}
+            word_clips = slice_sentence_audio_with_alignment_or_fallback(sentence, sentence_audio, method_report)
+            with TTS_CACHE_LOCK:
+                if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                    TTS_PREWARM_STATUS["clip_method"] = method_report.get("method", "")
+                    TTS_PREWARM_STATUS["fallback_reason"] = method_report.get("fallback_reason", "")
+        except Exception as exc:
+            LOGGER.exception("Word voice prewarm failed for sentence %r", sentence)
+            with TTS_CACHE_LOCK:
+                if TTS_PREWARM_STATUS.get("sentence") == sentence:
+                    TTS_PREWARM_STATUS["failed"] = int(TTS_PREWARM_STATUS.get("failed", 0)) + len(missing_words)
+                    TTS_PREWARM_STATUS["running"] = False
+                    TTS_PREWARM_STATUS["fallback_reason"] = str(exc)
+            return
 
     for word in missing_words:
         audio_bytes = word_clips.get(word)
@@ -614,6 +722,8 @@ def render_tts_status(status: dict[str, object]) -> str:
         method_label = "slower word help"
     elif clip_method == "signal_alignment":
         method_label = "fast word help"
+    elif clip_method == "curriculum_labels":
+        method_label = "instant local word help"
 
     if ready >= total:
         title = f' title="{fallback_reason}"' if fallback_reason else ""
@@ -750,7 +860,14 @@ def next_sentence(idx: int, inference_engine: str = TURBO_ENGINE) -> tuple[int, 
 
 
 def listen_to_sentence(current_index: int, inference_engine: str = TURBO_ENGINE) -> Optional[str]:
-    return synthesize_speech(CURRICULUM[int(current_index) % len(CURRICULUM)], inference_engine)
+    sentence = CURRICULUM[int(current_index) % len(CURRICULUM)]
+    if inference_engine == LOCAL_ENGINE:
+        audio_path = local_curriculum_audio_path(sentence)
+        if audio_path is not None:
+            return str(audio_path)
+        if not LOCAL_LIVE_TTS_ENABLED:
+            return None
+    return synthesize_speech(sentence, inference_engine)
 
 
 def update_audio_help(
