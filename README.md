@@ -29,7 +29,7 @@ tags:
 *Track: Backyard AI*
 
 ## 📖 The Vision
-Learning to read is a monumental milestone for young children, but practice can be intimidating when feedback is inconsistent, delayed, or too harsh for developing speech. **Read-Along AI** was built to solve a very specific problem: *[Insert personalization: e.g., Detail how you homeschool your children, and this tool was built specifically to solve the friction of your daily reading curriculum]* providing a patient, distraction-free reading assistant that listens to a child read short sentences and gives instant, gentle feedback.
+Learning to read is a monumental milestone for young children, but practice can be intimidating when feedback is inconsistent, delayed, or too harsh for developing speech. **Read-Along AI** was built for home reading practice: a patient, distraction-free reading assistant that listens to a child read short sentences and gives instant, gentle feedback. *[Insert personalization: e.g., Detail how you homeschool your children, and this tool was built specifically to solve the friction of your daily reading curriculum]* 
 
 **Field Testing Note:** *[Insert brief anecdote or reaction from the children actually using the app here to prove real-world usage for the Backyard AI track]*
 
@@ -60,6 +60,12 @@ The app deliberately ships with both inference paths:
 * **⚡ Turbo Mode (Modal):** Routes the same Gradio UI through Modal endpoints for low-latency Cohere ASR, VoxCPM TTS, and the hosted MiniCPM evaluator.
 
 For final judging, Off the Grid Mode should be verified on the live Space with Modal credentials absent or unused. The Q4 GGUF is resolved from `LOCAL_MINICPM_GGUF_PATH`, `models/gguf/minicpm-phonetic-evaluator-q4_k_m.gguf`, or downloaded into the Space cache from `kingkw1/minicpm-phonetic-evaluator` as `minicpm-phonetic-evaluator-q4_k_m.gguf`. This keeps the Space repository under the free 1 GB storage limit while still running the evaluator locally through `llama.cpp`.
+
+### Badge Verification Notes
+* **Off the Grid:** The live Space has been verified in Off the Grid Mode on a short recorded sentence. The local path runs without Modal calls: `faster-whisper` transcribes the microphone audio, VoxCPM generates local speech, and the MiniCPM evaluator runs from local GGUF weights after the Space caches the model file.
+* **Llama Champion:** The phonetic evaluator loads `minicpm-phonetic-evaluator-q4_k_m.gguf` through `llama-cpp-python`, the Python binding for `llama.cpp`.
+* **Runtime note:** A roughly 3-second reading attempt currently takes about 10 seconds end-to-end in local mode on the deployed Space. This is acceptable for the hackathon MVP and keeps the privacy-preserving path demonstrable.
+* **Scope note:** “Off the Grid” here means no external/cloud inference APIs during local mode. The Space may download model weights from Hugging Face into its cache, but inference itself runs in the Space process.
 
 ## 🏆 Hackathon Eligibility & Attributions
 
@@ -107,8 +113,8 @@ COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh -
 * 🏅 **Well-Tuned:** [`kingkw1/minicpm-phonetic-evaluator`](https://huggingface.co/kingkw1/minicpm-phonetic-evaluator)
 * 🏅 **Tiny Titan:** Every individual model used in this pipeline (and their combined footprint) is strictly under the 4B parameter threshold.
   * *Parameter Math:* Cohere Transcribe/faster-whisper (2B / 0.04B) + OpenBMB VoxCPM (0.5B) + MiniCPM Evaluator (2.4B) = ***2.9B Total Parameters***.
-* 🏅 **Off the Grid:** The app includes a UI toggle that disconnects from Modal and runs `faster-whisper`, `llama.cpp`, and VoxCPM entirely locally inside the Hugging Face Space.
-* 🏅 **Llama Champion:** The local phonetic evaluator runs exclusively through `llama-cpp-python`.
+* 🏅 **Off the Grid:** The app includes a UI toggle that disconnects from Modal and runs `faster-whisper`, `llama.cpp`, and VoxCPM locally inside the Hugging Face Space.
+* 🏅 **Llama Champion:** The local phonetic evaluator runs the Q4 GGUF through `llama-cpp-python`.
 * 🏅 **Sharing is Caring:** *[Insert Hugging Face Dataset Link to Codex Agent Traces]*
 * 🏅 **Field Notes:** *[Insert Link to Blog Post / Medium Article]*
 
