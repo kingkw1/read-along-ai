@@ -49,7 +49,7 @@ For a deep dive into the architecture and development plan, please review our sp
 ### Components
 * **Frontend:** A custom, gamified Gradio interface ("Off-Brand" UI) built for legibility and young readers, with a custom HTML reading canvas, child-sized controls, local CSS/JS reward effects, and hidden Gradio chrome.
 * **ASR (Speech-to-Text):** **Cohere Transcribe** (2B parameters) in Turbo Mode and `faster-whisper` `tiny.en` in Off the Grid Mode.
-* **Reading Evaluator:** A fine-tuned **MiniCPM phonetic evaluator** (`kingkw1/minicpm-phonetic-evaluator`) judges close or ambiguous ASR transcripts after exact normalized matching.
+* **Reading Evaluator:** A fine-tuned **MiniCPM phonetic evaluator** (`kingkw1/minicpm-phonetic-evaluator`) judges close or ambiguous ASR transcripts after exact normalized matching. The tracked model card source lives at [`docs/model_cards/minicpm-phonetic-evaluator.md`](docs/model_cards/minicpm-phonetic-evaluator.md).
 * **TTS / Audio Help:** **OpenBMB VoxCPM** (0.5B parameters) powers Modal Turbo Mode and was used to generate local curriculum audio assets. Off the Grid Mode defaults to committed sentence WAVs plus label-sliced word clips for responsive local assistance.
 * **Compute / Inference:** Utilizes a **Dual-Mode Hybrid Architecture**. The app includes **Turbo Mode** for Modal serverless endpoints and **Off the Grid Mode** for local Hugging Face Space resources.
 
