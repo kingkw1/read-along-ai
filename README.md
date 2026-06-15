@@ -130,8 +130,8 @@ The Gradio layer is used as the app runtime and event system, while the child-fa
 
 * **Desktop screenshot:** *[Insert screenshot of the live Space showing the custom reading canvas, mascot/progress row, engine toggle, and microphone control]*
 * **Mobile/tablet screenshot:** *[Insert narrow-screen screenshot proving the child-facing UI remains readable and polished on a family device]*
-* **Celebration clip:** *[Insert short GIF/video clip of a successful read triggering the center-burst confetti and auto-advance]*
-* **Default-Gradio contrast note:** *[Optional: Insert one sentence explaining that the child never sees a data-science-style Gradio panel, exposed API controls, or raw model outputs during the learning loop]*
+* **Celebration clip:** ![Celebration Confetti](data/assets/confetti.gif)
+* **Default-Gradio contrast note:** Unlike standard Gradio interfaces designed for data scientists, Read-Along AI completely hides all API widgets, raw model outputs, and default component chrome, ensuring the child only interacts with a distraction-free, gamified reading canvas.
 
 ## 🚀 How It Works
 The hackathon MVP is focused on a stable sentence-reading loop:
