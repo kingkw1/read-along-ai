@@ -140,6 +140,55 @@ The hackathon MVP is focused on a stable sentence-reading loop:
 
 Earlier phonics and CVC word levels were intentionally deferred. The current submission prioritizes reliability, privacy, and demo clarity around short-sentence reading practice.
 
+### How It Handles Imperfect Child Speech
+Read-Along AI is intentionally more patient than a plain transcript matcher, but it is not a permissive "anything goes" checker.
+
+The evaluation path has two stages:
+
+1. **Exact normalized match:** The app first strips casing and punctuation noise, then accepts clean readings immediately. A child should not wait on an LLM when they clearly read the sentence.
+2. **Fine-tuned phonetic judgment:** If the transcript is close but not exact, the app asks the fine-tuned MiniCPM evaluator whether the child appears to have attempted the target sentence. This is meant for cases like early articulation, ASR substitutions, or dialectal/phonetic variants.
+
+For example, the evaluator can accept a child-like variant such as **"Da dog ran fast"** for **"The dog ran fast"** because the target words and meaning are preserved. It should reject a changed-meaning reading such as **"She had a blue hat"** for **"She had a red hat"** because the important word changed. The product goal is developmentally fair feedback: reward real reading effort, fail closed when the sentence meaning changes, and keep the retry prompt gentle.
+
+## 💻 Running Locally
+The submitted Hugging Face Space is the official judging artifact, but the same app can run on a local machine for privacy testing and Off the Grid verification.
+
+### 1. Create an environment
+Use Python 3.11, then install the repository dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+### 2. Run the local app
+Start the Gradio app from the repository root:
+
+```bash
+python app.py
+```
+
+Open the local URL printed by Gradio, usually `http://127.0.0.1:7860`, and select **🏕️ Off the Grid Mode (Local)** in the app. In this mode, microphone recordings are transcribed by local `faster-whisper`, the MiniCPM evaluator runs through `llama-cpp-python`, and sentence/word help uses committed curriculum audio from `data/curriculum_audio/`.
+
+### 3. Model weight behavior
+The Q4 MiniCPM GGUF is intentionally not committed to the Space repository because of the 1 GB storage limit. Local mode resolves it in this order:
+
+1. `LOCAL_MINICPM_GGUF_PATH`
+2. `models/gguf/minicpm-phonetic-evaluator-q4_k_m.gguf`
+3. Hugging Face cache download from `kingkw1/minicpm-phonetic-evaluator`
+
+For a fully offline localhost demo, run the app once while connected so the model can be cached, or point `LOCAL_MINICPM_GGUF_PATH` at an existing local GGUF file before disconnecting.
+
+### 4. Run the local smoke test
+The local smoke test verifies the same privacy-preserving path without starting the UI:
+
+```bash
+python scripts/manual/local_smoke.py
+```
+
+It transcribes a committed curriculum WAV with `faster-whisper`, resolves the GGUF evaluator, and asks MiniCPM to judge the target sentence. Modal credentials are not required for this path. Turbo Mode is optional and only uses Modal when `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` are configured.
+
 ## 📹 Submission Links
 * **Demo Video:** [Insert Video Link]
 * **Social Post:** [Insert X/LinkedIn Link]
