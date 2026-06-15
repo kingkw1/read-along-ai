@@ -1010,6 +1010,14 @@ def build_app() -> gr.Blocks:
             tts_ready_audio = gr.Textbox(value="{}", visible="hidden", elem_id="tts-ready-audio")
             success_trigger = gr.Textbox(value="", visible=False, elem_id="success-trigger")
 
+            gr.HTML(
+                '<div style="text-align: center; margin-top: 2rem; padding: 1rem; color: #666; font-size: 0.9rem;">'
+                '⚡ <b>Judges:</b> Experiencing slow "Off the Grid" inference? '
+                '<a href="https://huggingface.co/spaces/kingkw1/read-along-ai" target="_blank" style="color: #0066cc; text-decoration: underline;">'
+                'Try the CPU-Upgraded Mirror here!</a>'
+                '</div>'
+            )
+
         microphone.stop_recording(
             fn=loading_feedback,
             inputs=None,

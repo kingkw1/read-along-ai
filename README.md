@@ -31,7 +31,11 @@ tags:
 
 # 🦉 Read-Along AI: The Offline Reading Teacher
 
-**Live App:** [read-along-ai](https://huggingface.co/spaces/build-small-hackathon/read-along-ai)
+**Live App (Official Submission):** [build-small-hackathon/read-along-ai](https://huggingface.co/spaces/build-small-hackathon/read-along-ai)  
+*(Note: This is the official hackathon submission Space. Because organization billing restrictions prevent personal CPU upgrades here, "Off the Grid" local inference takes ~10s per interaction.)*
+
+⚡ **High-Speed Mirror:** [kingkw1/read-along-ai](https://huggingface.co/spaces/kingkw1/read-along-ai)  
+*(Judges: For the best interactive experience of the local "Off the Grid" mode, please use this identical mirror hosted on a CPU-upgraded instance!)*
 
 **Organization:** Hosted under the official [`build-small-hackathon`](https://huggingface.co/build-small-hackathon) HF Org.
 
