@@ -17,6 +17,16 @@ tags:
   - sharing-is-caring
   - field-notes
   - well-tuned
+  - track:backyard
+  - sponsor:openbmb
+  - sponsor:openai
+  - sponsor:modal
+  - achievement:offgrid
+  - achievement:welltuned
+  - achievement:offbrand
+  - achievement:llama
+  - achievement:sharing
+  - achievement:fieldnotes
 ---
 
 # 🦉 Read-Along AI: The Offline Reading Teacher
