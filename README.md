@@ -119,7 +119,7 @@ COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh -
   * *Parameter Math:* Cohere Transcribe/faster-whisper (2B / 0.04B) + OpenBMB VoxCPM (0.5B) + MiniCPM Evaluator (2.4B) = ***2.9B Total Parameters***.
 * 🏅 **Off the Grid:** The app includes a UI toggle that disconnects from Modal and runs `faster-whisper` plus the MiniCPM evaluator through `llama.cpp` locally inside the Hugging Face Space. Local sentence and word audio assistance comes from committed WAV assets, with live local VoxCPM kept as an opt-in fallback.
 * 🏅 **Llama Champion:** The local phonetic evaluator runs the Q4 GGUF through `llama-cpp-python`.
-* 🏅 **Sharing is Caring:** *[Insert Hugging Face Dataset Link to Codex Agent Traces]*
+* 🏅 **Sharing is Caring:** [read-along-ai-agent-traces](https://huggingface.co/datasets/kingkw1/read-along-ai-agent-traces)
 * 🏅 **Field Notes:** [Building Read-Along AI: Field Notes from a Small-Model Reading Tutor](https://dev.to/kingkw1/building-read-along-ai-field-notes-from-a-small-model-reading-tutor-3e11) ([repo mirror](docs/FIELD_NOTES.md))
 
 ### Off-Brand UI Evidence
