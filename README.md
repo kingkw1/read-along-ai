@@ -29,11 +29,14 @@ tags:
 *Track: Backyard AI*
 
 ## 📖 The Vision
-Learning to read is a monumental milestone for young children, but practice can be intimidating when feedback is inconsistent, delayed, or too harsh for developing speech. **Read-Along AI** was built for home reading practice: a patient, distraction-free reading assistant that listens to a child read short sentences and gives instant, gentle feedback. *[Insert personalization: e.g., Detail how you homeschool your children, and this tool was built specifically to solve the friction of your daily reading curriculum]* 
 
-**Field Testing Note:** *[Insert brief anecdote or reaction from the children actually using the app here to prove real-world usage for the Backyard AI track]*
+Learning to read is a monumental milestone, but standard voice-to-text models demand perfect diction. They treat a child's developing voice like a series of errors, turning practice into a frustrating test. **Read-Along AI** was built to fix this: it is a patient, distraction-free reading assistant that listens to a child read and provides instant, gentle feedback.
 
-Crucially, because this tool is for kids, it requires absolute data privacy. It leverages localized, small-parameter models to ensure a child's voice data never enters a corporate data lake. 
+As a homeschooling parent to four young children, managing daily reading practice can be chaotic. I built this tool for the **Backyard AI** track to solve a specific problem for the people I know best: to remove the friction from the daily reading curriculum for my 7-year-old son and 6-year-old daughter. Read-Along AI acts as an offline safety net—allowing them to sound out words at their own pace without the anxiety of a ticking clock, and without the privacy risks of sending their voices to a corporate cloud server.
+
+**Real-World Impact:** When I field-tested this with my kids, the engagement was immediate. Because the fine-tuned phonetic judge gracefully accepted their natural speech variations—and the gamified confetti cannon fired instantly upon a successful read—they voluntarily asked to keep "playing" through their reading assignment. It successfully transformed a high-friction task into an independent, confidence-building activity.
+
+Crucially, because this tool is for young learners, it requires absolute data privacy. It relies exclusively on localized, small-parameter models to ensure a child's voice data never enters a corporate data lake.
 
 ## 🛠️ The Tech Stack & Architecture
 This application strictly adheres to the < 32B parameter constraint, utilizing highly optimized small models for a real-time, fluid user experience.
@@ -190,7 +193,7 @@ python scripts/manual/local_smoke.py
 It transcribes a committed curriculum WAV with `faster-whisper`, resolves the GGUF evaluator, and asks MiniCPM to judge the target sentence. Modal credentials are not required for this path. Turbo Mode is optional and only uses Modal when `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` are configured.
 
 ## 📹 Submission Links
-* **Demo Video:** [Insert Video Link]
+* **Demo Video:** [YouTube Video](https://youtu.be/4bpbwhipLU4)
 * **Social Post:** [Hugging Face post](https://huggingface.co/posts/kingkw1/522163043386016)
 * **X/Twitter Cross-Post:** [kingkw1_dev status](https://x.com/kingkw1_dev/status/2066382453539803570)
 * **Field Notes:** [dev.to write-up](https://dev.to/kingkw1/building-read-along-ai-field-notes-from-a-small-model-reading-tutor-3e11)
