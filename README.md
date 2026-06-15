@@ -120,7 +120,7 @@ COMMIT_MESSAGE="Enable local Off the Grid inference" ./scripts/deploy_space.sh -
 * 🏅 **Off the Grid:** The app includes a UI toggle that disconnects from Modal and runs `faster-whisper` plus the MiniCPM evaluator through `llama.cpp` locally inside the Hugging Face Space. Local sentence and word audio assistance comes from committed WAV assets, with live local VoxCPM kept as an opt-in fallback.
 * 🏅 **Llama Champion:** The local phonetic evaluator runs the Q4 GGUF through `llama-cpp-python`.
 * 🏅 **Sharing is Caring:** *[Insert Hugging Face Dataset Link to Codex Agent Traces]*
-* 🏅 **Field Notes:** *[Insert Link to Blog Post / Medium Article]*
+* 🏅 **Field Notes:** [Building Read-Along AI: Field Notes from a Small-Model Reading Tutor](https://dev.to/kingkw1/building-read-along-ai-field-notes-from-a-small-model-reading-tutor-3e11) ([repo mirror](docs/FIELD_NOTES.md))
 
 ### Off-Brand UI Evidence
 The Gradio layer is used as the app runtime and event system, while the child-facing surface is custom HTML, CSS, and JavaScript designed for early readers. The intended judging view is a purpose-built reading app: one large sentence, tap-to-hear words, a simple read-aloud control, progress feedback, and celebration animation.
@@ -193,6 +193,7 @@ It transcribes a committed curriculum WAV with `faster-whisper`, resolves the GG
 * **Demo Video:** [Insert Video Link]
 * **Social Post:** [Hugging Face post](https://huggingface.co/posts/kingkw1/522163043386016)
 * **X/Twitter Cross-Post:** [kingkw1_dev status](https://x.com/kingkw1_dev/status/2066382453539803570)
+* **Field Notes:** [dev.to write-up](https://dev.to/kingkw1/building-read-along-ai-field-notes-from-a-small-model-reading-tutor-3e11)
 
 ## 👥 Team
 * Hugging Face Username: `kingkw1`
