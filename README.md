@@ -191,7 +191,8 @@ It transcribes a committed curriculum WAV with `faster-whisper`, resolves the GG
 
 ## 📹 Submission Links
 * **Demo Video:** [Insert Video Link]
-* **Social Post:** [Insert X/LinkedIn Link]
+* **Social Post:** [Hugging Face post](https://huggingface.co/posts/kingkw1/522163043386016)
+* **X/Twitter Cross-Post:** [kingkw1_dev status](https://x.com/kingkw1_dev/status/2066382453539803570)
 
 ## 👥 Team
 * Hugging Face Username: `kingkw1`
